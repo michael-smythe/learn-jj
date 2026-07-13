@@ -98,9 +98,14 @@ function loadLevel(lv, { showIntro = true } = {}) {
   $('#winBanner').classList.add('hidden');
   document.body.classList.remove('sandbox');
 
+  state.usesFiles = [...lv.start, ...lv.solution].some(c => /^(echo|rm|cat|ls)\b|jj file /.test(c));
   termOut.innerHTML = '';
   print(`— Level: ${lv.title} —`, 'ok');
   print('Objective: ' + lv.objective, 'dim');
+  if (state.usesFiles) {
+    print('This level has a mock working directory (see the "working dir" strip above).', 'dim');
+    print('Interact with it:  ls · cat <file> · echo <content> > <file> · rm <file>', 'dim');
+  }
   print('Type "help" for commands, "hint" if stuck.', 'dim');
   renderAll();
   if (showIntro) openIntro(lv);
@@ -110,6 +115,7 @@ function loadLevel(lv, { showIntro = true } = {}) {
 function loadSandbox() {
   state.level = null;
   state.engine = new JJEngine(SEED);
+  state.usesFiles = true;
   state.goalState = null;
   state.solved = false;
   state.cmdCount = 0;
@@ -126,9 +132,39 @@ function loadSandbox() {
   termInput.focus();
 }
 
+function renderFiles() {
+  const bar = $('#filesBar');
+  const list = $('#filesList');
+  const st = state.engine.getState();
+  const wcChange = st.changes.find(c => c.id === st.wc);
+  const tree = (wcChange && wcChange.tree) || {};
+  const names = Object.keys(tree).sort();
+  const show = names.length > 0 || state.usesFiles;
+  bar.classList.toggle('hidden', !show);
+  if (!show) return;
+  list.innerHTML = '';
+  if (!names.length) {
+    const s = document.createElement('span');
+    s.className = 'fileEmpty';
+    s.textContent = 'empty — create a file:  echo hello > notes.txt';
+    list.appendChild(s);
+    return;
+  }
+  for (const n of names) {
+    const conflicted = tree[n] === '!conflict';
+    const chip = document.createElement('button');
+    chip.className = 'fileChip' + (conflicted ? ' conflict' : '');
+    chip.textContent = (conflicted ? '× ' : '') + n;
+    chip.title = (conflicted ? 'unresolved conflict — ' : '') + 'click to cat ' + n;
+    chip.onclick = () => exec('cat ' + n);
+    list.appendChild(chip);
+  }
+}
+
 function renderAll() {
   window.GraphView.render(mainSvg, state.engine.getState());
   if (state.level) window.GraphView.render(goalSvg, state.goalState, { small: true });
+  renderFiles();
 }
 
 function runCheck() {

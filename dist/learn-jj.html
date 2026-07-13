@@ -59,6 +59,25 @@ main { flex: 1; display: flex; min-height: 0; }
   font-size: 12.5px; line-height: 1.45; background: var(--panel2);
 }
 #objectiveBar .objLabel { color: var(--yellow); font-weight: 600; margin-right: 6px; }
+#filesBar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 14px; border-bottom: 1px solid var(--border); background: var(--panel2);
+}
+#filesBar.hidden { display: none; }
+.filesLabel {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--yellow); flex: none;
+}
+#filesList { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.fileChip {
+  font-family: var(--mono); font-size: 11px; padding: 2.5px 9px;
+  border-radius: 6px; background: var(--panel); border: 1px solid var(--border);
+  color: var(--accent); cursor: pointer;
+}
+.fileChip:hover { border-color: var(--accent); }
+.fileChip.conflict { color: var(--red); border-color: color-mix(in srgb, var(--red) 60%, var(--border)); }
+.fileEmpty { color: var(--dim); font-size: 11px; font-style: italic; }
+
 #termOut {
   flex: 1; overflow-y: auto; padding: 10px 14px;
   font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
@@ -227,6 +246,7 @@ html, body { height: 100%; margin: 0; padding: 0; }
 <main>
   <section id="terminal">
     <div id="objectiveBar"><span class="objLabel">Objective</span><span id="objectiveText"></span></div>
+    <div id="filesBar" class="hidden"><span class="filesLabel">working dir</span><div id="filesList"></div></div>
     <div id="termOut"></div>
     <div id="termInputRow">
       <span class="prompt">$</span>
@@ -1943,6 +1963,18 @@ function buildNode(c, state, opts) {
     .map(([n, ref]) => ({ name: n + '@origin', stale: ref.stale }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Native hover tooltip with the full (untruncated) details.
+  const files = Object.entries(c.files || {});
+  const tipLines = [
+    c.desc || (isRoot ? 'root()' : '(no description set)'),
+    `${c.id} ${(c.commitId || '').slice(0, 8)}`,
+  ];
+  if (files.length) tipLines.push('files: ' + files.map(([f, p]) => ((p && p.to === null) ? '−' : '') + f).join(', '));
+  if (bks.length || rbks.length) tipLines.push('bookmarks: ' + [...bks, ...rbks.map(r => r.name)].join(', '));
+  if (c.conflicted) tipLines.push('⚠ unresolved conflict');
+  if (c.immutable && !isRoot) tipLines.push('◆ immutable (on pushed trunk)');
+  el('title', {}, g).textContent = tipLines.join('\n');
+
   if (isRoot) {
     el('rect', { x: -15, y: -15, width: 30, height: 30, rx: 4, transform: 'rotate(45)', class: 'nodeRoot' }, g);
     el('text', { y: 4, class: 'nodeDescText nodeRootText', 'text-anchor': 'middle' }, g).textContent = 'root';
@@ -2451,22 +2483,43 @@ const LEVELS = [
     solution: ['jj rebase -s kn -d kl', 'echo cherries > fruit.txt'],
   },
   {
-    id: 'conflicts-2', seq: 'conflicts', title: 'Conflicted merges are fine too',
+    id: 'conflicts-2', seq: 'conflicts', title: 'Anatomy of a 3-way merge',
     cards: [
-      `<p>Merging B (config=v2) with C (config=v3): git would stop at
-       <code>CONFLICT (content): merge conflict</code> and park it in your index.</p>
-       <p>jj happily <em>creates the merge commit with the conflict inside it</em>. The merge
-       exists, history is recorded, and the red × tells you there's homework. Resolve it in the
-       merge commit itself — write the file while <code>@</code> is on it.</p>`,
+      `<p>The classic situation: two branches grew from the same commit, and <em>both</em>
+       edited <code>config.txt</code>. Combining them is a <strong>3-way merge</strong>,
+       and every merge tool on earth uses the same three inputs:</p>
+       <ul>
+       <li><strong>base</strong> — the common ancestor (<code>timeout=30</code> here),</li>
+       <li><strong>side #1</strong> — one branch's version (<code>timeout=60</code>),</li>
+       <li><strong>side #2</strong> — the other branch's (<code>timeout=10</code>).</li></ul>
+       <p>If only one side changed a file, the merge takes it silently. If <em>both</em>
+       changed it differently from base — like here — that's a conflict, and a human decides.</p>`,
+      `<p><strong>How git handles this:</strong> <code>git merge</code> stops mid-flight.
+       Conflict markers land in your working tree, the index holds all three versions
+       (stages 1/2/3), and the repo is "in a merge" until you resolve and commit —
+       or bail out with <code>--abort</code>.</p>
+       <p><strong>How jj handles it:</strong> <code>jj new side-a side-b -m "…"</code> creates
+       the merge commit <em>immediately</em>, with the conflict recorded inside it (red ×).
+       Nothing blocks. The three versions travel with the commit until you settle them.</p>`,
+      `<p>Your walkthrough:</p>
+       <p>1. <code>jj new side-a side-b -m "merge: settle timeout"</code> — make the merge.<br>
+       2. <code>cat config.txt</code> — read the conflict: the markers literally show
+       <em>side #1</em>, <em>base</em>, and <em>side #2</em>.<br>
+       3. <code>jj st</code> — see the conflicted path listed.<br>
+       4. Decide, and write the answer: <code>echo timeout=60 &gt; config.txt</code>.</p>
+       <p>That's the entire ceremony. (jj also supports the git-style flow: <code>jj new</code>
+       on top, fix, <code>jj squash</code> the fix down — the hint jj prints walks you through it.)</p>`,
     ],
-    objective: 'Merge B and C into a change "M", then resolve config.txt to "v3".',
-    hint: 'jj new kl kn -m "M" · echo v3 > config.txt',
+    objective: 'Merge side-a and side-b into "merge: settle timeout", inspect the conflict with cat/jj st, and resolve config.txt to "timeout=60".',
+    hint: 'jj new side-a side-b -m "merge: settle timeout" · cat config.txt · echo timeout=60 > config.txt',
     start: [
-      'echo v1 > config.txt', 'jj commit -m "A"',
-      'echo v2 > config.txt', 'jj commit -m "B"',
-      'jj new kk -m "C"', 'echo v3 > config.txt',
+      'echo timeout=30 > config.txt', 'jj commit -m "base: default config"',
+      'echo timeout=60 > config.txt', 'jj describe -m "raise timeout"',
+      'jj bookmark create side-a',
+      'jj new kk -m "lower timeout"', 'echo timeout=10 > config.txt',
+      'jj bookmark create side-b',
     ],
-    solution: ['jj new kl kn -m "M"', 'echo v3 > config.txt'],
+    solution: ['jj new side-a side-b -m "merge: settle timeout"', 'echo timeout=60 > config.txt'],
   },
   {
     id: 'conflicts-3', seq: 'conflicts', title: 'Heal a whole stack',
@@ -2658,9 +2711,14 @@ function loadLevel(lv, { showIntro = true } = {}) {
   $('#winBanner').classList.add('hidden');
   document.body.classList.remove('sandbox');
 
+  state.usesFiles = [...lv.start, ...lv.solution].some(c => /^(echo|rm|cat|ls)\b|jj file /.test(c));
   termOut.innerHTML = '';
   print(`— Level: ${lv.title} —`, 'ok');
   print('Objective: ' + lv.objective, 'dim');
+  if (state.usesFiles) {
+    print('This level has a mock working directory (see the "working dir" strip above).', 'dim');
+    print('Interact with it:  ls · cat <file> · echo <content> > <file> · rm <file>', 'dim');
+  }
   print('Type "help" for commands, "hint" if stuck.', 'dim');
   renderAll();
   if (showIntro) openIntro(lv);
@@ -2670,6 +2728,7 @@ function loadLevel(lv, { showIntro = true } = {}) {
 function loadSandbox() {
   state.level = null;
   state.engine = new JJEngine(SEED);
+  state.usesFiles = true;
   state.goalState = null;
   state.solved = false;
   state.cmdCount = 0;
@@ -2686,9 +2745,39 @@ function loadSandbox() {
   termInput.focus();
 }
 
+function renderFiles() {
+  const bar = $('#filesBar');
+  const list = $('#filesList');
+  const st = state.engine.getState();
+  const wcChange = st.changes.find(c => c.id === st.wc);
+  const tree = (wcChange && wcChange.tree) || {};
+  const names = Object.keys(tree).sort();
+  const show = names.length > 0 || state.usesFiles;
+  bar.classList.toggle('hidden', !show);
+  if (!show) return;
+  list.innerHTML = '';
+  if (!names.length) {
+    const s = document.createElement('span');
+    s.className = 'fileEmpty';
+    s.textContent = 'empty — create a file:  echo hello > notes.txt';
+    list.appendChild(s);
+    return;
+  }
+  for (const n of names) {
+    const conflicted = tree[n] === '!conflict';
+    const chip = document.createElement('button');
+    chip.className = 'fileChip' + (conflicted ? ' conflict' : '');
+    chip.textContent = (conflicted ? '× ' : '') + n;
+    chip.title = (conflicted ? 'unresolved conflict — ' : '') + 'click to cat ' + n;
+    chip.onclick = () => exec('cat ' + n);
+    list.appendChild(chip);
+  }
+}
+
 function renderAll() {
   window.GraphView.render(mainSvg, state.engine.getState());
   if (state.level) window.GraphView.render(goalSvg, state.goalState, { small: true });
+  renderFiles();
 }
 
 function runCheck() {

@@ -91,6 +91,18 @@ function buildNode(c, state, opts) {
     .map(([n, ref]) => ({ name: n + '@origin', stale: ref.stale }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Native hover tooltip with the full (untruncated) details.
+  const files = Object.entries(c.files || {});
+  const tipLines = [
+    c.desc || (isRoot ? 'root()' : '(no description set)'),
+    `${c.id} ${(c.commitId || '').slice(0, 8)}`,
+  ];
+  if (files.length) tipLines.push('files: ' + files.map(([f, p]) => ((p && p.to === null) ? '−' : '') + f).join(', '));
+  if (bks.length || rbks.length) tipLines.push('bookmarks: ' + [...bks, ...rbks.map(r => r.name)].join(', '));
+  if (c.conflicted) tipLines.push('⚠ unresolved conflict');
+  if (c.immutable && !isRoot) tipLines.push('◆ immutable (on pushed trunk)');
+  el('title', {}, g).textContent = tipLines.join('\n');
+
   if (isRoot) {
     el('rect', { x: -15, y: -15, width: 30, height: 30, rx: 4, transform: 'rotate(45)', class: 'nodeRoot' }, g);
     el('text', { y: 4, class: 'nodeDescText nodeRootText', 'text-anchor': 'middle' }, g).textContent = 'root';

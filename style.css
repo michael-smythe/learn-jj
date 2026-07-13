@@ -56,6 +56,25 @@ main { flex: 1; display: flex; min-height: 0; }
   font-size: 12.5px; line-height: 1.45; background: var(--panel2);
 }
 #objectiveBar .objLabel { color: var(--yellow); font-weight: 600; margin-right: 6px; }
+#filesBar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 14px; border-bottom: 1px solid var(--border); background: var(--panel2);
+}
+#filesBar.hidden { display: none; }
+.filesLabel {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--yellow); flex: none;
+}
+#filesList { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.fileChip {
+  font-family: var(--mono); font-size: 11px; padding: 2.5px 9px;
+  border-radius: 6px; background: var(--panel); border: 1px solid var(--border);
+  color: var(--accent); cursor: pointer;
+}
+.fileChip:hover { border-color: var(--accent); }
+.fileChip.conflict { color: var(--red); border-color: color-mix(in srgb, var(--red) 60%, var(--border)); }
+.fileEmpty { color: var(--dim); font-size: 11px; font-style: italic; }
+
 #termOut {
   flex: 1; overflow-y: auto; padding: 10px 14px;
   font-family: var(--mono); font-size: 12.5px; line-height: 1.55;

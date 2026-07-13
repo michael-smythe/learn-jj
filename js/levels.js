@@ -382,22 +382,43 @@ const LEVELS = [
     solution: ['jj rebase -s kn -d kl', 'echo cherries > fruit.txt'],
   },
   {
-    id: 'conflicts-2', seq: 'conflicts', title: 'Conflicted merges are fine too',
+    id: 'conflicts-2', seq: 'conflicts', title: 'Anatomy of a 3-way merge',
     cards: [
-      `<p>Merging B (config=v2) with C (config=v3): git would stop at
-       <code>CONFLICT (content): merge conflict</code> and park it in your index.</p>
-       <p>jj happily <em>creates the merge commit with the conflict inside it</em>. The merge
-       exists, history is recorded, and the red × tells you there's homework. Resolve it in the
-       merge commit itself — write the file while <code>@</code> is on it.</p>`,
+      `<p>The classic situation: two branches grew from the same commit, and <em>both</em>
+       edited <code>config.txt</code>. Combining them is a <strong>3-way merge</strong>,
+       and every merge tool on earth uses the same three inputs:</p>
+       <ul>
+       <li><strong>base</strong> — the common ancestor (<code>timeout=30</code> here),</li>
+       <li><strong>side #1</strong> — one branch's version (<code>timeout=60</code>),</li>
+       <li><strong>side #2</strong> — the other branch's (<code>timeout=10</code>).</li></ul>
+       <p>If only one side changed a file, the merge takes it silently. If <em>both</em>
+       changed it differently from base — like here — that's a conflict, and a human decides.</p>`,
+      `<p><strong>How git handles this:</strong> <code>git merge</code> stops mid-flight.
+       Conflict markers land in your working tree, the index holds all three versions
+       (stages 1/2/3), and the repo is "in a merge" until you resolve and commit —
+       or bail out with <code>--abort</code>.</p>
+       <p><strong>How jj handles it:</strong> <code>jj new side-a side-b -m "…"</code> creates
+       the merge commit <em>immediately</em>, with the conflict recorded inside it (red ×).
+       Nothing blocks. The three versions travel with the commit until you settle them.</p>`,
+      `<p>Your walkthrough:</p>
+       <p>1. <code>jj new side-a side-b -m "merge: settle timeout"</code> — make the merge.<br>
+       2. <code>cat config.txt</code> — read the conflict: the markers literally show
+       <em>side #1</em>, <em>base</em>, and <em>side #2</em>.<br>
+       3. <code>jj st</code> — see the conflicted path listed.<br>
+       4. Decide, and write the answer: <code>echo timeout=60 &gt; config.txt</code>.</p>
+       <p>That's the entire ceremony. (jj also supports the git-style flow: <code>jj new</code>
+       on top, fix, <code>jj squash</code> the fix down — the hint jj prints walks you through it.)</p>`,
     ],
-    objective: 'Merge B and C into a change "M", then resolve config.txt to "v3".',
-    hint: 'jj new kl kn -m "M" · echo v3 > config.txt',
+    objective: 'Merge side-a and side-b into "merge: settle timeout", inspect the conflict with cat/jj st, and resolve config.txt to "timeout=60".',
+    hint: 'jj new side-a side-b -m "merge: settle timeout" · cat config.txt · echo timeout=60 > config.txt',
     start: [
-      'echo v1 > config.txt', 'jj commit -m "A"',
-      'echo v2 > config.txt', 'jj commit -m "B"',
-      'jj new kk -m "C"', 'echo v3 > config.txt',
+      'echo timeout=30 > config.txt', 'jj commit -m "base: default config"',
+      'echo timeout=60 > config.txt', 'jj describe -m "raise timeout"',
+      'jj bookmark create side-a',
+      'jj new kk -m "lower timeout"', 'echo timeout=10 > config.txt',
+      'jj bookmark create side-b',
     ],
-    solution: ['jj new kl kn -m "M"', 'echo v3 > config.txt'],
+    solution: ['jj new side-a side-b -m "merge: settle timeout"', 'echo timeout=60 > config.txt'],
   },
   {
     id: 'conflicts-3', seq: 'conflicts', title: 'Heal a whole stack',
