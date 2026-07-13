@@ -55,7 +55,7 @@ const HELP = [
   ['jj bookmark create|set|move|delete|list', 'manage bookmarks'],
   ['jj duplicate [rev]', 'copy a change'],
   ['jj undo · jj op log', 'the operation log & repo-wide undo'],
-  ['jj git push [--allow-new] [-b name] · jj git fetch', 'talk to origin (GitHub/GitLab)'],
+  ['jj git push [-b name|--all] · jj git fetch', 'talk to origin (GitHub/GitLab)'],
   ['jj file untrack <file>', 'stop tracking a file (add it to .gitignore first)'],
   ['jj revert -r <rev> -d <dest>', 'create an inverse commit (for immutable history)'],
   ['echo <text> > <file> · cat <file> · ls · rm <file>', 'tiny shell — files snapshot into @ automatically'],

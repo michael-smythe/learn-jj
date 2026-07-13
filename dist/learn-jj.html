@@ -313,6 +313,15 @@ class JJError extends Error {
   constructor(msg, hint) { super(msg); this.hint = hint; }
 }
 
+/* clap-style CLI errors (lowercase "error:", usage block) — mirrors real jj. */
+class ClapError extends Error {
+  constructor(lines) { super(lines[0]); this.clapLines = lines; }
+}
+
+/* Deterministic pseudo-timestamp shown in undo output (real jj prints wall
+ * time; the conformance test normalizes timestamps away). */
+const FAKE_TS = '2001-02-03 04:05:06';
+
 function tokenize(line) {
   const toks = []; let cur = ''; let q = null; let pending = false;
   for (const ch of line) {
@@ -326,7 +335,107 @@ function tokenize(line) {
   return toks;
 }
 
-function parseArgs(tokens, spec) {
+/* Usage strings shown in clap-style errors (taken from real `jj <cmd> --help`). */
+const USAGE = {
+  '': 'jj [OPTIONS] <COMMAND>',
+  new: 'jj new [OPTIONS] [REVSETS]...',
+  describe: 'jj describe [OPTIONS] [REVSETS]...',
+  commit: 'jj commit [OPTIONS] [FILESETS]...',
+  edit: 'jj edit <REVSET|-r <REVSET>>',
+  abandon: 'jj abandon [OPTIONS] [REVSETS]...',
+  squash: 'jj squash [OPTIONS] [FILESETS]...',
+  rebase: 'jj rebase [OPTIONS]',
+  bookmark: 'jj bookmark <COMMAND>',
+  'bookmark create': 'jj bookmark create <NAMES>...',
+  duplicate: 'jj duplicate [OPTIONS] [REVSETS]...',
+  undo: 'jj undo [OPTIONS] [OPERATION]',
+  log: 'jj log [OPTIONS] [FILESETS]...',
+  status: 'jj status [OPTIONS] [FILESETS]...',
+  git: 'jj git <COMMAND>',
+  'git push': 'jj git push [OPTIONS]',
+  'git fetch': 'jj git fetch [OPTIONS]',
+  file: 'jj file <COMMAND>',
+  revert: 'jj revert [OPTIONS]',
+  op: 'jj operation <COMMAND>',
+  resolve: 'jj resolve [OPTIONS] [FILESETS]...',
+};
+
+/* Real jj subcommands we don't simulate — acknowledged, never "unknown". */
+const STUB_COMMANDS = {
+  config: 'Configuration is fixed here; real jj: jj config list / jj config set.',
+  diff: 'Try jj st to see @’s changes, or cat <file> to read one.',
+  show: 'Try jj st, cat <file>, or read the graph — it is the show view here.',
+  split: 'Not simulated yet — squash/new cover most teaching cases.',
+  restore: 'Not simulated yet — rewrite the file with echo, or jj undo.',
+  absorb: 'Not simulated yet — use jj squash -r to fold work into an ancestor.',
+  evolog: 'Not simulated — jj op log shows this playground’s history.',
+  next: 'Not simulated yet — use jj edit <child-id> to move @ forward.',
+  prev: 'Not simulated yet — use jj edit @- to move @ back.',
+  workspace: 'Workspaces are not simulated in this playground.',
+  sparse: 'Sparse checkouts are not simulated in this playground.',
+  tag: 'Tags are not simulated — bookmarks cover the naming story here.',
+  sign: 'Commit signing is not simulated in this playground.',
+  fix: 'Code formatters are not simulated in this playground.',
+  util: 'Not applicable in this playground.',
+  parallelize: 'Not simulated yet — rebase the commits to be siblings instead.',
+  'simplify-parents': 'Not simulated in this playground.',
+  interdiff: 'Not simulated in this playground.',
+  diffedit: 'No editor here — write files directly with echo <content> > <file>.',
+  version: 'This is the learn-jj playground, imitating jj 0.43 behavior.',
+  root: 'The repo root is this playground’s whole world.',
+  help: 'Type "help" (without jj) for everything this playground supports.',
+};
+
+function levenshtein(a, b) {
+  const m = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) m[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+  }
+  return m[a.length][b.length];
+}
+
+function clapUnknownSubcommand(sub) {
+  const known = ['abandon', 'bookmark', 'commit', 'describe', 'duplicate', 'edit', 'file', 'git',
+    'log', 'new', 'operation', 'rebase', 'resolve', 'revert', 'squash', 'status', 'undo',
+    ...Object.keys(STUB_COMMANDS)];
+  const close = [...new Set(known)]
+    .map(k => [k, levenshtein(sub, k)])
+    .filter(([, d]) => d <= Math.max(2, Math.floor(sub.length / 3)))
+    .sort((a, b) => a[1] - b[1])
+    .map(([k]) => `'${k}'`);
+  const lines = [`error: unrecognized subcommand '${sub}'`];
+  if (close.length) {
+    lines.push('', close.length === 1
+      ? `  tip: a similar subcommand exists: ${close[0]}`
+      : `  tip: some similar subcommands exist: ${close.join(', ')}`);
+  }
+  lines.push('', `Usage: ${USAGE['']}`, '', "For more information, try '--help'.");
+  return lines;
+}
+
+function clapError(first, tip, usageKey) {
+  const lines = [first];
+  if (tip) lines.push('', `  tip: ${tip}`);
+  if (usageKey !== null) lines.push('', `Usage: ${USAGE[usageKey] || USAGE['']}`);
+  lines.push('', "For more information, try '--help'.");
+  return new ClapError(lines);
+}
+
+function clapMissingArgs(argDesc, usageKey) {
+  return new ClapError([
+    'error: the following required arguments were not provided:',
+    `  ${argDesc}`,
+    '',
+    `Usage: ${USAGE[usageKey] || USAGE['']}`,
+    '',
+    "For more information, try '--help'.",
+  ]);
+}
+
+function parseArgs(tokens, spec, usageKey) {
   const lookup = {};
   for (const [canon, def] of Object.entries(spec)) {
     lookup[canon] = canon;
@@ -340,12 +449,25 @@ function parseArgs(tokens, spec) {
       const eq = name.indexOf('=');
       if (eq >= 0) { inlineVal = name.slice(eq + 1); name = name.slice(0, eq); }
       const canon = lookup[name];
-      if (!canon) throw new JJError(`Unexpected argument "${tok}"`, 'Type "help" to see what this playground supports.');
+      if (!canon) {
+        throw clapError(`error: unexpected argument '${tok}' found`,
+          `to pass '${tok}' as a value, use '-- ${tok}'`, usageKey || '');
+      }
       const def = spec[canon];
       let val = true;
       if (def.value) {
         if (inlineVal !== null) val = inlineVal;
-        else { i++; if (i >= tokens.length) throw new JJError(`Option "${tok}" requires a value`); val = tokens[i]; }
+        else {
+          i++;
+          if (i >= tokens.length || (tokens[i].length > 1 && tokens[i][0] === '-' && !/^-\d/.test(tokens[i]))) {
+            throw new ClapError([
+              `error: a value is required for '${def.meta || `--${canon} <VALUE>`}' but none was supplied`,
+              '',
+              "For more information, try '--help'.",
+            ]);
+          }
+          val = tokens[i];
+        }
       }
       if (def.multi) (flags[canon] = flags[canon] || []).push(val);
       else flags[canon] = val;
@@ -369,11 +491,11 @@ class JJEngine {
     this.fetchCount = 0;
     this.ops = [];
     this.undoCursor = null;
-    const root = { id: ROOT_ID, commitId: '00000000', desc: '', parents: [], immutable: true, files: {} };
+    const root = { id: ROOT_ID, commitId: '000000000000', desc: '', parents: [], immutable: true, files: {} };
     this.changes.set(ROOT_ID, root);
     const first = this._createChange([ROOT_ID], '');
     this.wc = first.id;
-    this._recordOp('initialize repo');
+    this._recordOp("add workspace 'default'");
   }
 
   setRemoteScript(script) { this.remoteScript = script || []; }
@@ -391,7 +513,7 @@ class JJEngine {
 
   _createChange(parents, desc, files) {
     const ch = {
-      id: this._newChangeId(), commitId: this._randHex(8), desc: desc || '',
+      id: this._newChangeId(), commitId: this._randHex(12), desc: desc || '',
       parents: parents.slice(), immutable: false,
       files: files ? JSON.parse(JSON.stringify(files)) : {},
     };
@@ -548,7 +670,7 @@ class JJEngine {
   _touch(ids) {
     for (const id of ids) {
       const c = this.get(id);
-      if (c && !c.immutable) c.commitId = this._randHex(8);
+      if (c && !c.immutable) c.commitId = this._randHex(12);
     }
   }
 
@@ -572,9 +694,21 @@ class JJEngine {
 
   _descOf(c) { return c.desc ? c.desc : '(no description set)'; }
 
-  _fmt(id) {
+  /* One-line commit summary in real jj's format:
+   *   <change-id> <commit-id8> [bookmarks |] [(empty)] [(conflict)] <subject> */
+  _fmt(id, opts = {}) {
     const c = this.get(id);
-    return `${this.short(id)} ${c.commitId.slice(0, 8)} ${this._descOf(c)}`;
+    const parts = [id, c.commitId.slice(0, 8)];
+    const bks = opts.noBookmarks ? [] : this.bookmarksAt(id).map(n => {
+      const r = this.remote.get(n);
+      const stale = r && (r.id !== id || (this.get(r.id) && this.get(r.id).commitId !== r.commitId));
+      return n + (stale ? '*' : '');
+    });
+    if (bks.length) parts.push(bks.join(' ') + ' |');
+    if (Object.keys(c.files).length === 0) parts.push('(empty)');
+    if (!opts.noConflict && this._conflictedIds().has(id)) parts.push('(conflict)');
+    parts.push(this._descOf(c));
+    return parts.join(' ');
   }
 
   _wcLines() {
@@ -583,6 +717,17 @@ class JJEngine {
       lines.push({ t: `Parent commit (@-)      : ${this._fmt(p)}`, c: 'dim' });
     }
     return lines;
+  }
+
+  /* Real jj's warning block, printed whenever @'s tree has conflicts. */
+  _conflictWarning() {
+    const tree = this.computeTrees().get(this.wc) || {};
+    const bad = Object.keys(tree).filter(f => isConflict(tree[f])).sort();
+    if (!bad.length) return [];
+    return [
+      { t: 'Warning: There are unresolved conflicts at these paths:', c: 'err' },
+      ...bad.map(f => ({ t: `${f}    ${tree[f].conflict.sides.length}-sided conflict`, c: 'err' })),
+    ];
   }
 
   /* Moving @ away from an empty, undescribed, childless, bookmark-free change
@@ -602,12 +747,16 @@ class JJEngine {
 
   _checkRewritable(id) {
     const c = this.get(id);
-    if (this._immutableIds().has(id)) {
-      throw new JJError(`Commit ${c.commitId.slice(0, 8)} is immutable`,
-        id === ROOT_ID
-          ? 'The root commit cannot be rewritten or edited.'
-          : `Commits reachable from ${this._trunkName()}@origin are immutable — build on top with jj new, create an inverse commit with jj revert, or jj undo the push.`);
-    }
+    const immutable = this._immutableIds();
+    if (!immutable.has(id)) return;
+    if (id === ROOT_ID) throw new JJError(`The root commit 000000000000 is immutable`);
+    const wouldRewrite = [...this.descendantsOf(id, true)].filter(d => immutable.has(d)).length;
+    throw new JJError(`Commit ${c.commitId} is immutable`, [
+      `Hint: Could not modify commit: ${this._fmt(id)}`,
+      'Hint: Immutable commits are used to protect shared history.',
+      `Hint: This operation would rewrite ${wouldRewrite} immutable commits.`,
+      `(in this playground: commits on ${this._trunkName()}@origin are protected — build on top with jj new, or invert with jj revert)`,
+    ]);
   }
 
   /* ---------- revset resolution ---------- */
@@ -638,7 +787,7 @@ class JJEngine {
   _resolveBase(e, orig) {
     if (e === '@') return this.wc;
     if (e === 'root()') return ROOT_ID;
-    const dm = e.match(/^desc(?:ription)?\((.*)\)$/);
+    const dm = e.match(/^(?:desc(?:ription)?|subject)\((.*)\)$/);
     if (dm) {
       const pat = dm[1].replace(/^["']|["']$/g, '');
       let hits = [...this.changes.values()].filter(c => c.desc === pat).map(c => c.id);
@@ -703,7 +852,7 @@ class JJEngine {
       args = tokens.slice(2);
       const table = {
         new: '_cmdNew', describe: '_cmdDescribe', desc: '_cmdDescribe',
-        commit: '_cmdCommit', edit: '_cmdEdit', abandon: '_cmdAbandon',
+        commit: '_cmdCommit', ci: '_cmdCommit', edit: '_cmdEdit', abandon: '_cmdAbandon',
         squash: '_cmdSquash', rebase: '_cmdRebase', bookmark: '_cmdBookmark',
         b: '_cmdBookmark', duplicate: '_cmdDuplicate', undo: '_cmdUndo',
         op: '_cmdOp', operation: '_cmdOp', log: '_cmdLog', status: '_cmdStatus', st: '_cmdStatus',
@@ -714,11 +863,14 @@ class JJEngine {
         return { ok: true, lines: [{ t: 'jj — a version control system (playground). Type "help" for commands.', c: 'dim' }] };
       }
       method = table[sub];
-      if (!method) {
-        return { ok: false, lines: [
-          { t: `Error: unrecognized subcommand "${sub}"`, c: 'err' },
-          { t: 'Hint: type "help" to see what this playground supports.', c: 'dim' },
+      if (!method && STUB_COMMANDS[sub]) {
+        return { ok: true, lines: [
+          { t: `(jj ${sub} exists in real jj but isn't simulated in this playground)`, c: 'dim' },
+          { t: STUB_COMMANDS[sub], c: 'dim' },
         ] };
+      }
+      if (!method) {
+        return { ok: false, lines: clapUnknownSubcommand(sub).map((t, i) => ({ t, c: i === 0 ? 'err' : '' })) };
       }
     }
     const conflictsBefore = this._conflictedIds();
@@ -728,17 +880,36 @@ class JJEngine {
         this._recordOp(res.op);
         if (!res.keepUndoCursor) this.undoCursor = null;
         const after = this._conflictedIds();
-        const appeared = [...after].filter(id => !conflictsBefore.has(id)).map(id => this.short(id));
-        const resolved = [...conflictsBefore].filter(id => !after.has(id) && this.changes.has(id)).map(id => this.short(id));
-        if (appeared.length) res.lines.push({ t: `New conflicts appeared in these commits: ${appeared.join(', ')}`, c: 'err' });
-        if (resolved.length) res.lines.push({ t: `Existing conflicts were resolved or abandoned: ${resolved.join(', ')}`, c: 'ok' });
+        const appeared = [...after].filter(id => !conflictsBefore.has(id));
+        const resolved = [...conflictsBefore].filter(id => !after.has(id) && this.changes.has(id));
+        if (appeared.length) {
+          res.lines.push({ t: `New conflicts appeared in ${appeared.length} commits:`, c: 'err' });
+          appeared.forEach(id => res.lines.push({ t: `  ${this._fmt(id)}`, c: 'err' }));
+          res.lines.push(
+            { t: 'Hint: To resolve the conflicts, start by creating a commit on top of', c: 'dim' },
+            { t: 'the conflicted commit:', c: 'dim' },
+            { t: `  jj new ${appeared[0]}`, c: 'dim' },
+            { t: 'Then use `jj resolve`, or edit the conflict markers in the file directly.', c: 'dim' },
+            { t: 'Once the conflicts are resolved, you can inspect the result with `jj diff`.', c: 'dim' },
+            { t: 'Then run `jj squash` to move the resolution into the conflicted commit.', c: 'dim' },
+            { t: '(in this playground the fastest route is: echo <content> > <file>)', c: 'dim' },
+          );
+        }
+        if (resolved.length) {
+          res.lines.push({ t: `Existing conflicts were resolved or abandoned from ${resolved.length} commits.`, c: 'ok' });
+        }
       }
       return { ok: true, lines: res.lines, mutated: !!res.op };
     } catch (e) {
+      if (e instanceof ClapError) {
+        this._restoreLast();
+        return { ok: false, lines: e.clapLines.map((t, i) => ({ t, c: i === 0 ? 'err' : '' })) };
+      }
       if (e instanceof JJError) {
         this._restoreLast();
         const lines = [{ t: 'Error: ' + e.message, c: 'err' }];
-        if (e.hint) lines.push({ t: 'Hint: ' + e.hint, c: 'dim' });
+        if (Array.isArray(e.hint)) e.hint.forEach(h => lines.push({ t: h, c: 'dim' }));
+        else if (e.hint) lines.push({ t: 'Hint: ' + e.hint, c: 'dim' });
         return { ok: false, lines };
       }
       throw e;
@@ -753,7 +924,7 @@ class JJEngine {
       B: { value: true, aliases: ['insert-before'] },
       A: { value: true, aliases: ['insert-after'] },
       'no-edit': {},
-    });
+    }, 'new');
     if (flags.B && flags.A) throw new JJError('This playground supports either --insert-before or --insert-after, not both');
     const msg = typeof flags.m === 'string' ? flags.m : '';
     const lines = [];
@@ -798,7 +969,7 @@ class JJEngine {
     const { flags } = parseArgs(args, {
       m: { value: true, aliases: ['message'] },
       r: { value: true, aliases: ['revision'] },
-    });
+    }, 'describe');
     if (typeof flags.m !== 'string') {
       throw new JJError('A description is required', 'This playground has no editor — pass one with -m "my description".');
     }
@@ -809,11 +980,11 @@ class JJEngine {
     const lines = [];
     if (rev === this.wc) lines.push(...this._wcLines());
     else lines.push({ t: `Described ${this.short(rev)} as "${flags.m}"`, c: 'ok' });
-    return { op: `describe commit ${this.short(rev)}`, lines };
+    return { op: `describe commit ${this.get(rev).commitId}`, lines };
   }
 
   _cmdCommit(args) {
-    const { flags } = parseArgs(args, { m: { value: true, aliases: ['message'] } });
+    const { flags } = parseArgs(args, { m: { value: true, aliases: ['message'] } }, 'commit');
     if (typeof flags.m !== 'string') {
       throw new JJError('A description is required', 'This playground has no editor — use jj commit -m "my description".');
     }
@@ -822,23 +993,19 @@ class JJEngine {
     this._touch(this.descendantsOf(this.wc, true));
     const node = this._createChange([this.wc], '');
     this.wc = node.id;
-    return { op: `commit working copy: "${flags.m}"`, lines: this._wcLines() };
+    return { op: `commit ${cur.commitId}`, lines: this._wcLines() };
   }
 
   _cmdEdit(args) {
-    const { pos } = parseArgs(args, {});
-    if (!pos.length) throw new JJError('jj edit needs a revision, e.g. jj edit kl');
-    const rev = this.resolve(pos[0]);
-    const c = this.get(rev);
-    if (this._immutableIds().has(rev)) {
-      throw new JJError(`Commit ${c.commitId.slice(0, 8)} is immutable`,
-        `Use "jj new ${this.short(rev)}" to create a new change on top of it instead${rev === 'zzzzzzzz' ? '' : ', or jj revert to invert it'}.`);
-    }
+    const { flags, pos } = parseArgs(args, { r: { value: true, aliases: ['revision'] } }, 'edit');
+    if (!pos.length && !flags.r) throw clapMissingArgs('<REVSET|-r <REVSET>>', 'edit');
+    const rev = this.resolve(flags.r || pos[0]);
+    this._checkRewritable(rev);
     if (rev === this.wc) return { op: null, lines: [{ t: 'Already editing that change.', c: 'dim' }] };
     const lines = [];
     this._moveWC(rev, lines);
     lines.push(...this._wcLines());
-    return { op: `edit commit ${this.short(rev)}`, lines };
+    return { op: `edit commit ${this.get(rev).commitId}`, lines };
   }
 
   _cmdAbandon(args) {
@@ -854,6 +1021,7 @@ class JJEngine {
     const row = this._rows();
     const ordered = [...set].sort((a, b) => row[b] - row[a]); // children first
     const replacement = new Map();
+    const abandonedCids = [...set].map(id => this.get(id).commitId);
     const wcWasAbandoned = set.has(this.wc);
     const oldWcParents = this.get(this.wc).parents.slice();
 
@@ -874,9 +1042,10 @@ class JJEngine {
         lines.push({ t: `Moved bookmark ${name} to ${this.short(to)}`, c: 'dim' });
       }
       replacement.set(x, xc.parents.slice());
-      lines.unshift({ t: `Abandoned commit ${this.short(x)} ${this._descOf(xc)}`, c: 'ok' });
+      lines.unshift({ t: `  ${this._fmt(x, { noConflict: true })}`, c: '' });
       this.changes.delete(x);
     }
+    lines.unshift({ t: `Abandoned ${set.size} commits:`, c: 'ok' });
 
     // Fix any bookmarks that cascaded onto a change abandoned later.
     for (const [name, target] of this.bookmarks) {
@@ -903,8 +1072,10 @@ class JJEngine {
       const node = this._createChange(parents, '');
       this.wc = node.id;
       lines.push(...this._wcLines());
+    } else if (alive.includes(this.wc)) {
+      lines.push(...this._wcLines());
     }
-    const what = [...set].map(id => this.short(id)).join(', ');
+    const what = [...abandonedCids].join(' ');
     return { op: `abandon commit ${what}`, lines };
   }
 
@@ -912,11 +1083,14 @@ class JJEngine {
     const { flags } = parseArgs(args, {
       r: { value: true, aliases: ['revision'] },
       m: { value: true, aliases: ['message'] },
-    });
+    }, 'squash');
     const rev = flags.r ? this.resolve(flags.r) : this.wc;
     this._checkRewritable(rev);
     const rc = this.get(rev);
-    if (rc.parents.length !== 1) throw new JJError('Cannot squash merge commits', 'The change has more than one parent.');
+    if (rc.parents.length !== 1) {
+      throw new JJError('Cannot squash merge commits without a specified destination',
+        'Use `--into` to specify which parent to squash into');
+    }
     const parentId = rc.parents[0];
     this._checkRewritable(parentId);
     const parent = this.get(parentId);
@@ -947,19 +1121,20 @@ class JJEngine {
       const node = this._createChange([parentId], '');
       this.wc = node.id;
     }
+    const rebased = this.descendantsOf(parentId, false);
     this._touch(this.descendantsOf(parentId, true));
-    lines.unshift({ t: `Squashed ${this.short(rev)} into ${this.short(parentId)} ${this._descOf(parent)}`, c: 'ok' });
+    if (rebased.size) lines.unshift({ t: `Rebased ${rebased.size} descendant commits`, c: 'ok' });
     lines.push(...this._wcLines());
-    return { op: `squash commit ${this.short(rev)}`, lines };
+    return { op: `squash commits into ${parent.commitId}`, lines };
   }
 
   _cmdRebase(args) {
     const { flags } = parseArgs(args, {
-      r: { value: true, aliases: ['revision'] },
+      r: { value: true, aliases: ['revision', 'revisions'] },
       s: { value: true, aliases: ['source'] },
       b: { value: true, aliases: ['branch'] },
-      d: { value: true, multi: true, aliases: ['destination'] },
-    });
+      d: { value: true, multi: true, aliases: ['destination', 'onto'], meta: '--onto <REVSETS>' },
+    }, 'rebase');
     const modes = ['r', 's', 'b'].filter(k => flags[k]);
     if (modes.length > 1) throw new JJError('Use only one of -r, -s, -b');
     let dests = (flags.d || []).map(d => this.resolve(d));
@@ -993,6 +1168,7 @@ class JJEngine {
     const touch = new Set();
     const lines = [];
     let healed = 0;
+    const healedSet = new Set();
 
     if (mode === 'r') {
       const tc = this.get(target);
@@ -1008,9 +1184,9 @@ class JJEngine {
           else if (!np.includes(p)) np.push(p);
         }
         kid.parents = np.length ? np : [ROOT_ID];
-        for (const d of this.descendantsOf(kidId, true)) touch.add(d);
-        healed++;
+        for (const d of this.descendantsOf(kidId, true)) { touch.add(d); healedSet.add(d); }
       }
+      healed = healedSet.size;
       tc.parents = dests.slice();
       if (this.ancestorsOf(target, false).has(target)) {
         throw new JJError(`Cannot rebase ${this.short(target)} onto ${this.short(dests[0])}: that would create a cycle`);
@@ -1030,10 +1206,13 @@ class JJEngine {
 
     for (const id of moveSet) for (const d of this.descendantsOf(id, true)) touch.add(d);
     this._touch(touch);
-    lines.push({ t: `Rebased ${moveSet.size} commits onto ${this.short(dests[0])}${dests.length > 1 ? ` (+${dests.length - 1} more parents)` : ''}`, c: 'ok' });
-    if (healed) lines.push({ t: `Rebased ${healed} descendant commits onto parent of ${this.short(target)}`, c: 'dim' });
-    if (touch.has(this.wc) || moveSet.has(this.wc)) lines.push(...this._wcLines());
-    return { op: `rebase ${moveSet.size} commits`, lines };
+    lines.push({ t: `Rebased ${moveSet.size} commits to destination`, c: 'ok' });
+    if (healed) lines.push({ t: `Rebased ${healed} descendant commits`, c: 'dim' });
+    if (touch.has(this.wc) || moveSet.has(this.wc)) {
+      lines.push(...this._wcLines());
+      lines.push(...this._conflictWarning());
+    }
+    return { op: `rebase commit ${this.get(target).commitId}`, lines };
   }
 
   _cmdBookmark(args) {
@@ -1042,12 +1221,13 @@ class JJEngine {
     const { flags, pos } = parseArgs(rest, {
       r: { value: true, aliases: ['revision'] },
       to: { value: true },
-    });
+      'allow-backwards': {},
+    }, 'bookmark');
     const nameOk = n => /^[A-Za-z][\w./-]*$/.test(n) && n !== 'root';
 
     if (sub === 'list' || sub === 'l') {
       const lines = [...this.bookmarks.keys()].sort().map(name => ({
-        t: `${name}: ${this._fmt(this.bookmarks.get(name))}`, c: '',
+        t: `${name}: ${this._fmt(this.bookmarks.get(name), { noBookmarks: true })}`, c: '',
       }));
       if (!lines.length) lines.push({ t: '(no bookmarks)', c: 'dim' });
       return { op: null, lines };
@@ -1055,19 +1235,29 @@ class JJEngine {
     if (sub === 'create' || sub === 'set' || sub === 'c' || sub === 's') {
       const create = sub === 'create' || sub === 'c';
       const name = pos[0];
-      if (!name) throw new JJError(`jj bookmark ${sub} needs a name`);
+      if (!name) throw clapMissingArgs('<NAMES>...', 'bookmark create');
       if (!nameOk(name)) throw new JJError(`Invalid bookmark name "${name}"`);
       if (create && this.bookmarks.has(name)) {
-        throw new JJError(`Bookmark already exists: ${name}`, `Use "jj bookmark set ${name} -r <rev>" to move it.`);
+        throw new JJError(`Bookmark already exists: ${name}`, 'Use `jj bookmark set` to update it.');
       }
       const rev = flags.r ? this.resolve(flags.r) : this.wc;
       if (rev === ROOT_ID) throw new JJError('Cannot point a bookmark at the root commit');
       const existed = this.bookmarks.has(name);
+      if (existed && !create && !flags['allow-backwards']) {
+        const old = this.bookmarks.get(name);
+        if (old !== rev && !this.descendantsOf(old, true).has(rev)) {
+          throw new JJError(`Refusing to move bookmark backwards or sideways: ${name}`,
+            'Use --allow-backwards to allow it.');
+        }
+      }
+      const lines = [];
+      const rc = this.get(rev);
+      if (create && Object.keys(rc.files).length === 0 && !rc.desc && rev !== ROOT_ID) {
+        lines.push({ t: 'Warning: Target revision is empty.', c: 'dim' });
+      }
       this.bookmarks.set(name, rev);
-      return {
-        op: `${existed ? 'move' : 'create'} bookmark ${name}`,
-        lines: [{ t: `${existed ? 'Moved' : 'Created'} 1 bookmarks ${existed ? 'to' : 'pointing to'} ${this._fmt(rev)}`, c: 'ok' }],
-      };
+      lines.push({ t: `${existed ? 'Moved 1 bookmarks to' : 'Created 1 bookmarks pointing to'} ${this._fmt(rev)}`, c: 'ok' });
+      return { op: `${existed ? 'point bookmark' : 'create bookmark'} ${name} to commit ${rc.commitId}`, lines };
     }
     if (sub === 'move' || sub === 'm') {
       const name = pos[0];
@@ -1075,12 +1265,24 @@ class JJEngine {
       if (!flags.to) throw new JJError('jj bookmark move needs --to <rev>');
       const rev = this.resolve(flags.to);
       if (rev === ROOT_ID) throw new JJError('Cannot point a bookmark at the root commit');
+      if (this.bookmarks.get(name) === rev) {
+        return { op: null, lines: [{ t: 'No bookmarks to update.', c: 'dim' }] };
+      }
+      if (!flags['allow-backwards'] && !this.descendantsOf(this.bookmarks.get(name), true).has(rev)) {
+        throw new JJError(`Refusing to move bookmark backwards or sideways: ${name}`,
+          'Use --allow-backwards to allow it.');
+      }
       this.bookmarks.set(name, rev);
-      return { op: `move bookmark ${name}`, lines: [{ t: `Moved 1 bookmarks to ${this._fmt(rev)}`, c: 'ok' }] };
+      return { op: `point bookmark ${name} to commit ${this.get(rev).commitId}`, lines: [{ t: `Moved 1 bookmarks to ${this._fmt(rev)}`, c: 'ok' }] };
     }
     if (sub === 'delete' || sub === 'd') {
       const name = pos[0];
-      if (!name || !this.bookmarks.has(name)) throw new JJError(`No such bookmark: ${name || '(none given)'}`);
+      if (!name || !this.bookmarks.has(name)) {
+        return { op: null, lines: [
+          { t: `Warning: No matching bookmarks for names: ${name || ''}`, c: 'dim' },
+          { t: 'No bookmarks to delete.', c: 'dim' },
+        ] };
+      }
       this.bookmarks.delete(name);
       return { op: `delete bookmark ${name}`, lines: [{ t: `Deleted 1 bookmarks.`, c: 'ok' }] };
     }
@@ -1094,17 +1296,27 @@ class JJEngine {
     const rc = this.get(rev);
     const node = this._createChange(rc.parents, rc.desc, rc.files);
     return {
-      op: `duplicate commit ${this.short(rev)}`,
-      lines: [{ t: `Duplicated ${this.short(rev)} as ${this.short(node.id)} ${this._descOf(node)}`, c: 'ok' }],
+      op: `duplicate 1 commits`,
+      lines: [{ t: `Duplicated ${rc.commitId} as ${this._fmt(node.id)}`, c: 'ok' }],
     };
   }
 
   /* ---------- files: shell-style commands operating on @ ---------- */
 
+  /* Conflicted files print in jj's "snapshot" materialization style. */
   _fmtVal(v) {
     if (!isConflict(v)) return v;
     const c = v.conflict;
-    return `<<<<<<< side #1\n${c.sides[0] ?? '(absent)'}\n||||||| base\n${c.base ?? '(absent)'}\n=======\n${c.sides[1] ?? '(absent)'}\n>>>>>>> side #2`;
+    return [
+      '<<<<<<< conflict 1 of 1',
+      '+++++++ Contents of side #1',
+      c.sides[0] ?? '(absent)',
+      '------- Contents of base',
+      c.base ?? '(absent)',
+      '+++++++ Contents of side #2',
+      c.sides[1] ?? '(absent)',
+      '>>>>>>> conflict 1 of 1 ends',
+    ].join('\n');
   }
 
   _shEcho(args) {
@@ -1177,8 +1389,11 @@ class JJEngine {
       const gi = tree['.gitignore'];
       const patterns = gi && !isConflict(gi) ? gi.split(/\s+/) : [];
       if (!patterns.includes(file)) {
-        throw new JJError(`'${file}' is not ignored, so jj would immediately snapshot it right back`,
-          `Add it to .gitignore first: echo ${file} > .gitignore (or >> to append). Same rule as real jj.`);
+        throw new JJError(`'${file}' is not ignored.`, [
+          'Hint: Files that are not ignored will be added back by the next command.',
+          "Make sure they're ignored, then try again.",
+          `(here: echo ${file} > .gitignore — or >> to append)`,
+        ]);
       }
       const c = this.get(this.wc);
       const base = this._baseTreeOf(this.wc, null);
@@ -1217,53 +1432,79 @@ class JJEngine {
   _gitPush(rest) {
     const { flags } = parseArgs(rest, {
       b: { value: true, multi: true, aliases: ['bookmark'] },
-      'allow-new': {}, 'allow-empty-description': {},
-    });
-    let names = flags.b || [...this.bookmarks.keys()];
+      all: {}, tracked: {}, 'allow-empty-description': {},
+    }, 'git push');
+    // Real jj model: plain push moves bookmarks that are *tracking* a remote
+    // bookmark (here: ones origin already has). -b NAME also creates+tracks
+    // new bookmarks; --all pushes everything.
+    let names;
+    const warnings = [];
     if (flags.b) {
+      names = flags.b;
       for (const n of names) if (!this.bookmarks.has(n)) throw new JJError(`No such bookmark: ${n}`);
+    } else if (flags.all) {
+      names = [...this.bookmarks.keys()];
+    } else {
+      names = [];
+      for (const n of this.bookmarks.keys()) {
+        if (this.remote.has(n)) names.push(n);
+        else {
+          warnings.push(
+            { t: `Warning: Refusing to create new remote bookmark ${n}@origin`, c: 'dim' },
+            { t: `Hint: Run \`jj bookmark track ${n} --remote=origin\` and try again.`, c: 'dim' },
+            { t: `(in this playground: push it with -b ${n}, or push everything with --all)`, c: 'dim' },
+          );
+        }
+      }
     }
     const trees = this.computeTrees();
     const changed = [];
     for (const name of names) {
       const target = this.bookmarks.get(name);
       const cur = this.remote.get(name);
-      if (cur && cur.id === target && cur.commitId === this.get(target).commitId) continue;
-      if (!cur && !flags['allow-new']) {
-        throw new JJError(`Refusing to create new remote bookmark ${name}@origin`,
-          `Pass --allow-new to create the branch on origin (real jj safety flag): jj git push --allow-new -b ${name}`);
+      if (cur && cur.id === target && cur.commitId === this.get(target).commitId) {
+        warnings.push({ t: `Bookmark ${name}@origin already matches ${name}`, c: 'dim' });
+        continue;
       }
       // Validate the commits that would land on origin.
       for (const id of this.ancestorsOf(target, true)) {
         if (id === ROOT_ID) continue;
         const c = this.get(id);
         if (Object.values(trees.get(id) || {}).some(isConflict)) {
-          throw new JJError(`Won't push commit ${c.commitId.slice(0, 8)} since it has conflicts`, 'Resolve the conflict first — origin should never see conflict markers.');
+          throw new JJError(`Won't push commit ${c.commitId} since it has conflicts`,
+            `Rejected commit: ${this._fmt(id)}`);
         }
         if (!c.desc && !flags['allow-empty-description']) {
-          throw new JJError(`Won't push commit ${c.commitId.slice(0, 8)} since it has no description`, 'jj describe it first — every commit on origin needs a message.');
+          throw new JJError(`Won't push commit ${c.commitId} since it has no description`,
+            `Rejected commit: ${this._fmt(id)}`);
         }
       }
       changed.push(name);
     }
-    if (!changed.length) return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
-    const lines = [{ t: 'Changes to push to origin:', c: 'ok' }];
+    if (!changed.length) {
+      return { op: null, lines: [...warnings, { t: 'Nothing changed.', c: 'dim' }] };
+    }
+    const lines = [...warnings, { t: 'Changes to push to origin:', c: 'ok' }];
     for (const name of changed) {
       const target = this.bookmarks.get(name);
       const cur = this.remote.get(name);
-      lines.push({
-        t: cur
-          ? `  Move ${name} from ${cur.commitId.slice(0, 8)} to ${this.get(target).commitId.slice(0, 8)}`
-          : `  Add ${name} → ${this.get(target).commitId.slice(0, 8)} (new branch on origin)`,
-        c: '',
-      });
-      this.remote.set(name, { id: target, commitId: this.get(target).commitId });
+      const newCid = this.get(target).commitId;
+      let what;
+      if (!cur) what = `add to ${newCid}`;
+      else if (this.changes.has(cur.id) && this.get(cur.id).commitId === cur.commitId &&
+               this.descendantsOf(cur.id, true).has(target)) {
+        what = `move forward from ${cur.commitId} to ${newCid}`;
+      } else {
+        what = `move sideways from ${cur.commitId} to ${newCid}`;
+      }
+      lines.push({ t: `  bookmark: ${name} [${what}]`, c: '' });
+      this.remote.set(name, { id: target, commitId: newCid });
     }
     const trunk = this._trunkName();
     if (trunk && changed.includes(trunk)) {
-      lines.push({ t: `Commits reachable from ${trunk}@origin are now immutable (◆) — shared history is protected.`, c: 'dim' });
+      lines.push({ t: `(commits reachable from ${trunk}@origin are now immutable ◆ — shared history is protected)`, c: 'dim' });
     }
-    return { op: `push bookmarks ${changed.join(', ')} to origin`, lines };
+    return { op: `push bookmarks to git remote origin`, lines };
   }
 
   _gitFetch() {
@@ -1288,20 +1529,20 @@ class JJEngine {
       const node = this._createChange([parentId], ev.desc, files);
       const oldRemoteId = cur ? cur.id : null;
       this.remote.set(ev.on, { id: node.id, commitId: node.commitId });
-      lines.push({ t: `bookmark: ${ev.on}@origin [updated] — new commit ${this.short(node.id)} "${ev.desc}"`, c: 'ok' });
+      lines.push({ t: `bookmark: ${ev.on}@origin [updated] tracked`, c: 'ok' });
       if (this.bookmarks.get(ev.on) === oldRemoteId || this.bookmarks.get(ev.on) === parentId) {
         this.bookmarks.set(ev.on, node.id);
-        lines.push({ t: `  (local bookmark ${ev.on} tracked the update and moved too)`, c: 'dim' });
+        lines.push({ t: `(local bookmark ${ev.on} tracked the update and moved along)`, c: 'dim' });
       }
     }
-    return { op: 'fetch from origin', lines };
+    return { op: 'fetch from git remote(s) origin', lines };
   }
 
   _cmdRevert(args) {
     const { flags } = parseArgs(args, {
       r: { value: true, aliases: ['revision'] },
       d: { value: true, aliases: ['destination'] },
-    });
+    }, 'revert');
     if (!flags.r) throw new JJError('jj revert needs -r <rev> (the commit to invert)');
     const rev = this.resolve(flags.r);
     if (rev === ROOT_ID) throw new JJError('Cannot revert the root commit');
@@ -1311,7 +1552,7 @@ class JJEngine {
     for (const [f, p] of Object.entries(rc.files)) files[f] = { from: p.to ?? null, to: p.from ?? null };
     const node = this._createChange([dest], `Revert "${rc.desc || this.short(rev)}"`, files);
     return {
-      op: `revert commit ${this.short(rev)}`,
+      op: `revert commit ${rc.commitId}`,
       lines: [
         { t: `Created ${this.short(node.id)} on ${this.short(dest)}: inverse of ${this.short(rev)} "${rc.desc}"`, c: 'ok' },
         { t: '(revert adds an inverse commit — the original stays in history)', c: 'dim' },
@@ -1324,20 +1565,27 @@ class JJEngine {
     const targetIdx = base - 1;
     if (targetIdx < 0) throw new JJError('Nothing to undo (already at the initial operation)');
     const undone = this.ops[base];
-    this._restore(this.ops[targetIdx].snap);
+    const restoredTo = this.ops[targetIdx];
+    this._restore(restoredTo.snap);
     this.undoCursor = targetIdx;
     return {
-      op: `undo operation: ${undone.desc}`,
+      op: `undo: restore to operation ${restoredTo.id}`,
       keepUndoCursor: true,
-      lines: [{ t: `Undid operation: ${undone.desc}`, c: 'ok' }, ...this._wcLines()],
+      lines: [
+        { t: `Undid operation: ${undone.id} (${FAKE_TS}) ${undone.desc}`, c: 'ok' },
+        { t: `Restored to operation: ${restoredTo.id} (${FAKE_TS}) ${restoredTo.desc}`, c: 'dim' },
+        ...this._wcLines(),
+      ],
     };
   }
 
   _cmdOp(args) {
     const sub = args[0];
     if (sub === 'log' || !sub) {
+      const { flags } = parseArgs(args.slice(1), { limit: { value: true, aliases: ['n'] } }, 'op');
+      const limit = flags.limit ? parseInt(flags.limit, 10) : Infinity;
       const lines = [];
-      for (let i = this.ops.length - 1; i >= 0; i--) {
+      for (let i = this.ops.length - 1; i >= 0 && lines.length < limit; i--) {
         const o = this.ops[i];
         lines.push({ t: `${i === this.ops.length - 1 ? '@ ' : '○ '}${o.id}  ${o.desc}`, c: i === this.ops.length - 1 ? 'ok' : '' });
       }
@@ -1386,17 +1634,12 @@ class JJEngine {
       lines.push({ t: 'Working copy changes:', c: '' });
       for (const [f, p] of entries) {
         const kind = (p.from ?? null) === null ? 'A' : (p.to ?? null) === null ? 'D' : 'M';
-        lines.push({ t: `  ${kind} ${f}`, c: kind === 'D' ? 'err' : 'ok' });
+        lines.push({ t: `${kind} ${f}`, c: kind === 'D' ? 'err' : 'ok' });
       }
-    }
-    const tree = this.computeTrees().get(this.wc);
-    const conflicted = Object.keys(tree).filter(f => isConflict(tree[f]));
-    if (conflicted.length) {
-      lines.push({ t: 'There are unresolved conflicts at these paths:', c: 'err' });
-      conflicted.forEach(f => lines.push({ t: `  ${f}    (write the file to resolve: echo <content> > ${f})`, c: 'err' }));
     }
     lines.push({ t: `Working copy  (@) : ${this._fmt(this.wc)}`, c: 'ok' });
     lines.push(...c.parents.map(p => ({ t: `Parent commit (@-): ${this._fmt(p)}`, c: 'dim' })));
+    lines.push(...this._conflictWarning());
     return { op: null, lines };
   }
 
@@ -2124,19 +2367,21 @@ const LEVELS = [
        <strong>a jj bookmark <em>is</em> a git branch</strong> when it reaches the remote.
        <code>main</code> here becomes <code>main</code> on GitHub. Your teammates on git never
        know you're using jj.</p>
-       <p><code>jj git push --allow-new</code> pushes bookmarks to origin
-       (<code>--allow-new</code> is jj's safety flag for creating a branch that doesn't exist
-       on the remote yet). After a push you'll see a teal <code>main@origin</code> chip —
-       that's the remote-tracking view, git's <code>origin/main</code>.</p>`,
+       <p><code>jj git push -b main</code> pushes the bookmark to origin, creating the
+       branch there and marking it <em>tracked</em>. (A plain <code>jj git push</code> only
+       moves bookmarks that already track a remote branch — jj refuses to invent new remote
+       branches without <code>-b</code> or <code>--all</code>.) After the push you'll see a
+       teal <code>main@origin</code> chip — the remote-tracking view, git's
+       <code>origin/main</code>.</p>`,
       `<p>Two guard rails you get for free — jj refuses to push commits that
        <em>have no description</em> or <em>contain conflicts</em>. And once commits land on
        <code>main@origin</code> they turn <strong>immutable (◆)</strong>: jj won't let you rewrite
        shared trunk history by accident. This is the "protected branch" concept, enforced client-side.</p>`,
     ],
     objective: 'Push main to origin, creating the branch there.',
-    hint: 'jj git push --allow-new',
+    hint: 'jj git push -b main',
     start: ['jj commit -m "A"', 'jj commit -m "B"', 'jj bookmark create main -r @-'],
-    solution: ['jj git push --allow-new'],
+    solution: ['jj git push -b main'],
   },
   {
     id: 'remotes-2', seq: 'remotes', title: 'The PR fixup loop',
@@ -2154,9 +2399,9 @@ const LEVELS = [
     objective: 'Address the review: replace login.js with login-form.js (content "v1"), then update the PR branch on origin.',
     hint: 'rm login.js · echo v1 > login-form.js · jj git push',
     start: [
-      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push -b main',
       'jj describe -m "C: add login"', 'echo v1 > login.js',
-      'jj bookmark create feat', 'jj git push --allow-new -b feat',
+      'jj bookmark create feat', 'jj git push -b feat',
     ],
     solution: ['rm login.js', 'echo v1 > login-form.js', 'jj git push'],
   },
@@ -2174,7 +2419,7 @@ const LEVELS = [
     objective: 'Fetch the teammate\'s work, then rebase your feature stack (C and D) onto the updated main.',
     hint: 'jj git fetch · jj rebase -b @ -d main',
     start: [
-      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push -b main',
       'jj new main -m "C: feature"', 'echo c1 > feature.txt',
       'jj new -m "D: more feature"', 'echo c2 > feature2.txt',
     ],
@@ -2278,9 +2523,9 @@ const LEVELS = [
     objective: 'Remove secrets.env from the feature commit and update feat on origin. (And in real life: rotate the token!)',
     hint: 'rm secrets.env · jj git push',
     start: [
-      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push -b main',
       'jj describe -m "F: deploy script"', 'echo run > deploy.sh', 'echo TOKEN=xyz > secrets.env',
-      'jj bookmark create feat', 'jj git push --allow-new -b feat',
+      'jj bookmark create feat', 'jj git push -b feat',
     ],
     solution: ['rm secrets.env', 'jj git push'],
   },
@@ -2302,7 +2547,7 @@ const LEVELS = [
     start: [
       'echo hello > app.js', 'jj commit -m "A"',
       'echo KEY=oops > secrets.env', 'jj commit -m "add deploy config"',
-      'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj bookmark create main -r @-', 'jj git push -b main',
     ],
     solution: ['jj revert -r kl -d main', 'jj bookmark set main -r kn', 'jj git push'],
   },
@@ -2370,7 +2615,7 @@ const HELP = [
   ['jj bookmark create|set|move|delete|list', 'manage bookmarks'],
   ['jj duplicate [rev]', 'copy a change'],
   ['jj undo · jj op log', 'the operation log & repo-wide undo'],
-  ['jj git push [--allow-new] [-b name] · jj git fetch', 'talk to origin (GitHub/GitLab)'],
+  ['jj git push [-b name|--all] · jj git fetch', 'talk to origin (GitHub/GitLab)'],
   ['jj file untrack <file>', 'stop tracking a file (add it to .gitignore first)'],
   ['jj revert -r <rev> -d <dest>', 'create an inverse commit (for immutable history)'],
   ['echo <text> > <file> · cat <file> · ls · rm <file>', 'tiny shell — files snapshot into @ automatically'],

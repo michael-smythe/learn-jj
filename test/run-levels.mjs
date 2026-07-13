@@ -157,8 +157,12 @@ function expect(cond, msg) {
   e.setRemoteScript([[{ on: 'main', desc: 'teammate', files: { 't.txt': 'x' } }]]);
   e.run('jj commit -m "A"');
   e.run('jj bookmark create main -r @-');
-  expect(!e.run('jj git push').ok, 'push refuses new branch without --allow-new');
-  expect(e.run('jj git push --allow-new').ok, 'push --allow-new works');
+  {
+    const r = e.run('jj git push');
+    expect(r.ok && r.lines.some(l => l.t.includes('Refusing to create new remote bookmark')),
+      'plain push refuses to create new remote branch (warning, like jj 0.43)');
+  }
+  expect(e.run('jj git push -b main').ok, 'push -b creates and tracks the branch');
   expect(!e.run('jj describe -r kk -m "rewrite"').ok, 'pushed trunk commit is immutable');
   expect(!e.run('jj edit kk').ok, 'cannot edit immutable commit');
   const before = e.getState().remoteBookmarks.main.id;
@@ -172,14 +176,14 @@ function expect(cond, msg) {
   // pushing an undescribed commit is refused
   const p = new JJ.JJEngine(6);
   p.run('jj bookmark create feat');
-  expect(!p.run('jj git push --allow-new').ok, 'push refuses commits with no description');
+  expect(!p.run('jj git push -b feat').ok, 'push refuses commits with no description');
 
   // stale remote chip after rewrite + revert inverse
   const q = new JJ.JJEngine(8);
   q.run('jj describe -m "F"');
   q.run('echo TOKEN > secrets.env');
   q.run('jj bookmark create feat');
-  q.run('jj git push --allow-new -b feat');
+  q.run('jj git push -b feat');
   expect(!q.getState().remoteBookmarks.feat.stale, 'freshly pushed branch is not stale');
   q.run('rm secrets.env');
   expect(q.getState().remoteBookmarks.feat.stale, 'rewriting a pushed commit marks remote stale');
@@ -195,7 +199,7 @@ function expect(cond, msg) {
   e.run('echo KEY > secrets.env');
   e.run('jj commit -m "bad"');
   e.run('jj bookmark create main -r @-');
-  e.run('jj git push --allow-new');
+  e.run('jj git push -b main');
   expect(!e.run('jj edit kl').ok, 'trunk commit immutable after push');
   expect(e.run('jj revert -r kl -d main').ok, 'revert works');
   const st = e.getState();

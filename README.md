@@ -19,9 +19,9 @@ in a terminal, watch the change graph respond, match the goal state to clear eac
    combined finale.
 5. **Files & the Auto-Snapshot** — no staging area or untracked state; keeping files
    out with `.gitignore` + `jj file untrack`; editing file content deep in history.
-6. **GitHub & GitLab** — bookmarks as remote branches: `jj git push --allow-new`,
-   the PR-fixup loop (rewrite + repush, no force-push ritual), `jj git fetch` +
-   rebase onto a moving trunk, and trunk immutability (◆).
+6. **GitHub & GitLab** — bookmarks as remote branches: `jj git push -b <name>` and
+   tracked bookmarks, the PR-fixup loop (rewrite + repush, no force-push ritual),
+   `jj git fetch` + rebase onto a moving trunk, and trunk immutability (◆).
 7. **Conflicts Without Fear** — conflicts recorded inside commits: rebases/merges
    never stop, `cat` shows real conflict markers, resolving once heals whole stacks.
 8. **Oops: Secrets & History Surgery** — removing a secret before pushing, from a
@@ -61,11 +61,22 @@ python3 -m http.server 8677 -d .
 ## Tests
 
 ```sh
-node test/run-levels.mjs
+node test/run-levels.mjs    # levels: every solution reaches its goal + engine units
+node test/conformance.mjs   # fidelity: simulator output vs real jj transcripts
 ```
 
-Validates that every level's start state replays, isn't already solved at load, and that
-the published solution reaches the goal — plus engine unit checks.
+`run-levels` validates that every level's start state replays, isn't already solved at
+load, and that the published solution reaches the goal — plus engine unit checks.
+
+`conformance` replays golden transcripts captured from the **real jj binary**
+(`test/transcripts.json`) through the simulator and asserts outcome parity (success vs
+error) and message parity (every line real jj printed must appear in the simulator's
+output, after normalizing IDs/hashes/timestamps). Regenerate the fixtures against your
+installed jj with:
+
+```sh
+node tools/gen-transcripts.mjs   # requires jj on PATH; fixtures are committed
+```
 
 ## Single-file bundle
 

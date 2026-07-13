@@ -298,19 +298,21 @@ const LEVELS = [
        <strong>a jj bookmark <em>is</em> a git branch</strong> when it reaches the remote.
        <code>main</code> here becomes <code>main</code> on GitHub. Your teammates on git never
        know you're using jj.</p>
-       <p><code>jj git push --allow-new</code> pushes bookmarks to origin
-       (<code>--allow-new</code> is jj's safety flag for creating a branch that doesn't exist
-       on the remote yet). After a push you'll see a teal <code>main@origin</code> chip —
-       that's the remote-tracking view, git's <code>origin/main</code>.</p>`,
+       <p><code>jj git push -b main</code> pushes the bookmark to origin, creating the
+       branch there and marking it <em>tracked</em>. (A plain <code>jj git push</code> only
+       moves bookmarks that already track a remote branch — jj refuses to invent new remote
+       branches without <code>-b</code> or <code>--all</code>.) After the push you'll see a
+       teal <code>main@origin</code> chip — the remote-tracking view, git's
+       <code>origin/main</code>.</p>`,
       `<p>Two guard rails you get for free — jj refuses to push commits that
        <em>have no description</em> or <em>contain conflicts</em>. And once commits land on
        <code>main@origin</code> they turn <strong>immutable (◆)</strong>: jj won't let you rewrite
        shared trunk history by accident. This is the "protected branch" concept, enforced client-side.</p>`,
     ],
     objective: 'Push main to origin, creating the branch there.',
-    hint: 'jj git push --allow-new',
+    hint: 'jj git push -b main',
     start: ['jj commit -m "A"', 'jj commit -m "B"', 'jj bookmark create main -r @-'],
-    solution: ['jj git push --allow-new'],
+    solution: ['jj git push -b main'],
   },
   {
     id: 'remotes-2', seq: 'remotes', title: 'The PR fixup loop',
@@ -328,9 +330,9 @@ const LEVELS = [
     objective: 'Address the review: replace login.js with login-form.js (content "v1"), then update the PR branch on origin.',
     hint: 'rm login.js · echo v1 > login-form.js · jj git push',
     start: [
-      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push -b main',
       'jj describe -m "C: add login"', 'echo v1 > login.js',
-      'jj bookmark create feat', 'jj git push --allow-new -b feat',
+      'jj bookmark create feat', 'jj git push -b feat',
     ],
     solution: ['rm login.js', 'echo v1 > login-form.js', 'jj git push'],
   },
@@ -348,7 +350,7 @@ const LEVELS = [
     objective: 'Fetch the teammate\'s work, then rebase your feature stack (C and D) onto the updated main.',
     hint: 'jj git fetch · jj rebase -b @ -d main',
     start: [
-      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push -b main',
       'jj new main -m "C: feature"', 'echo c1 > feature.txt',
       'jj new -m "D: more feature"', 'echo c2 > feature2.txt',
     ],
@@ -452,9 +454,9 @@ const LEVELS = [
     objective: 'Remove secrets.env from the feature commit and update feat on origin. (And in real life: rotate the token!)',
     hint: 'rm secrets.env · jj git push',
     start: [
-      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push -b main',
       'jj describe -m "F: deploy script"', 'echo run > deploy.sh', 'echo TOKEN=xyz > secrets.env',
-      'jj bookmark create feat', 'jj git push --allow-new -b feat',
+      'jj bookmark create feat', 'jj git push -b feat',
     ],
     solution: ['rm secrets.env', 'jj git push'],
   },
@@ -476,7 +478,7 @@ const LEVELS = [
     start: [
       'echo hello > app.js', 'jj commit -m "A"',
       'echo KEY=oops > secrets.env', 'jj commit -m "add deploy config"',
-      'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj bookmark create main -r @-', 'jj git push -b main',
     ],
     solution: ['jj revert -r kl -d main', 'jj bookmark set main -r kn', 'jj git push'],
   },
