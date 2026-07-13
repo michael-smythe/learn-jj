@@ -85,7 +85,11 @@ function buildNode(c, state, opts) {
   const g = el('g', { class: 'node' });
   const isWC = c.id === state.wc;
   const isRoot = c.parents.length === 0;
-  const bks = Object.entries(state.bookmarks).filter(([, t]) => t === c.id).map(([n]) => n).sort();
+  const bks = Object.entries(state.bookmarks)
+    .filter(([, v]) => (typeof v === 'string' ? v === c.id : v.conflict.includes(c.id)))
+    .map(([n, v]) => n + (typeof v === 'string' ? '' : '??'))
+    .sort();
+  const bkConflicted = bks.some(n => n.endsWith('??'));
   const rbks = Object.entries(state.remoteBookmarks || {})
     .filter(([, ref]) => ref.id === c.id)
     .map(([n, ref]) => ({ name: n + '@origin', stale: ref.stale }))
@@ -100,6 +104,7 @@ function buildNode(c, state, opts) {
   if (files.length) tipLines.push('files: ' + files.map(([f, p]) => ((p && p.to === null) ? '−' : '') + f).join(', '));
   if (bks.length || rbks.length) tipLines.push('bookmarks: ' + [...bks, ...rbks.map(r => r.name)].join(', '));
   if (c.conflicted) tipLines.push('⚠ unresolved conflict');
+  if (c.divergent) tipLines.push('⚠ divergent: another visible commit shares this change ID');
   if (c.immutable && !isRoot) tipLines.push('◆ immutable (on pushed trunk)');
   el('title', {}, g).textContent = tipLines.join('\n');
 
@@ -124,15 +129,20 @@ function buildNode(c, state, opts) {
   }
 
   if (!opts.hideIds) {
+    const disp = c.dispId || c.id;
     const idText = el('text', { y: R + 16, class: 'nodeId', 'text-anchor': 'middle' }, g);
     if (c.immutable && !isRoot) {
       const im = el('tspan', { class: 'immuMark' }, idText);
       im.textContent = '◆ ';
     }
-    const hi = el('tspan', { class: 'nodeIdHi' }, idText);
-    hi.textContent = c.id.slice(0, 2);
+    const hi = el('tspan', { class: c.divergent ? 'nodeIdHi divergent' : 'nodeIdHi' }, idText);
+    hi.textContent = disp.slice(0, 2);
     const lo = el('tspan', { class: 'nodeIdLo' }, idText);
-    lo.textContent = c.id.slice(2, 5);
+    lo.textContent = disp.slice(2, 5) + (c.divergent && disp.includes('/') ? disp.slice(disp.indexOf('/')) : '');
+    if (c.divergent) {
+      const dv = el('tspan', { class: 'divergentMark' }, idText);
+      dv.textContent = ' ??';
+    }
   }
 
   if (isWC) {
@@ -143,7 +153,7 @@ function buildNode(c, state, opts) {
 
   let chipRow = 0;
   bks.forEach(name => {
-    const chip = el('g', { transform: `translate(${R + 10}, ${-10 + chipRow++ * 21})`, class: 'bookmarkChip' }, g);
+    const chip = el('g', { transform: `translate(${R + 10}, ${-10 + chipRow++ * 21})`, class: name.endsWith('??') ? 'bookmarkChip conflicted' : 'bookmarkChip' }, g);
     const w = 14 + name.length * 7.2;
     el('rect', { x: 0, y: 0, width: w, height: 17, rx: 8 }, chip);
     el('text', { x: w / 2, y: 12, 'text-anchor': 'middle' }, chip).textContent = name;

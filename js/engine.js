@@ -206,7 +206,7 @@ class JJEngine {
     this.fetchCount = 0;
     this.ops = [];
     this.undoCursor = null;
-    const root = { id: ROOT_ID, commitId: '000000000000', desc: '', parents: [], immutable: true, files: {} };
+    const root = { id: ROOT_ID, commitId: '000000000000', desc: '', parents: [], immutable: true, files: {}, displayId: ROOT_ID };
     this.changes.set(ROOT_ID, root);
     const first = this._createChange([ROOT_ID], '');
     this.wc = first.id;
@@ -232,6 +232,7 @@ class JJEngine {
       parents: parents.slice(), immutable: false,
       files: files ? JSON.parse(JSON.stringify(files)) : {},
     };
+    ch.displayId = ch.id;
     this.changes.set(ch.id, ch);
     return ch;
   }
@@ -271,10 +272,27 @@ class JJEngine {
     return seen;
   }
 
+  _bkTargets(val) { return typeof val === 'string' ? [val] : val.conflict; }
+
   bookmarksAt(id) {
     const out = [];
-    for (const [name, target] of this.bookmarks) if (target === id) out.push(name);
+    for (const [name, val] of this.bookmarks) if (this._bkTargets(val).includes(id)) out.push(name);
     return out.sort();
+  }
+
+  _bookmarkConflicted(name) {
+    const v = this.bookmarks.get(name);
+    return v !== undefined && typeof v !== 'string';
+  }
+
+  /* Divergence: two live commits sharing a change ID (displayId). */
+  _divergentIds(displayId) {
+    return [...this.changes.values()].filter(c => c.displayId === displayId);
+  }
+
+  _dispId(c) {
+    const div = this._divergentIds(c.displayId).length > 1;
+    return div && c.divergentSeq != null ? `${c.displayId}/${c.divergentSeq}` : c.displayId;
   }
 
   remoteBookmarksAt(id) {
@@ -413,8 +431,10 @@ class JJEngine {
    *   <change-id> <commit-id8> [bookmarks |] [(empty)] [(conflict)] <subject> */
   _fmt(id, opts = {}) {
     const c = this.get(id);
-    const parts = [id, c.commitId.slice(0, 8)];
+    const divergent = this._divergentIds(c.displayId).length > 1;
+    const parts = [this._dispId(c), c.commitId.slice(0, 8)];
     const bks = opts.noBookmarks ? [] : this.bookmarksAt(id).map(n => {
+      if (this._bookmarkConflicted(n)) return n + '??';
       const r = this.remote.get(n);
       const stale = r && (r.id !== id || (this.get(r.id) && this.get(r.id).commitId !== r.commitId));
       return n + (stale ? '*' : '');
@@ -422,6 +442,7 @@ class JJEngine {
     if (bks.length) parts.push(bks.join(' ') + ' |');
     if (Object.keys(c.files).length === 0) parts.push('(empty)');
     if (!opts.noConflict && this._conflictedIds().has(id)) parts.push('(conflict)');
+    if (divergent) parts.push('(divergent)');
     parts.push(this._descOf(c));
     return parts.join(' ');
   }
@@ -511,11 +532,34 @@ class JJEngine {
       if (hits.length > 1) throw new JJError(`Revset "${orig}" resolved to more than one revision`);
       return hits[0];
     }
-    if (this.bookmarks.has(e)) return this.bookmarks.get(e);
-    if (/^[k-z]+$/.test(e)) {
-      const hits = [...this.changes.keys()].filter(id => id.startsWith(e));
+    const rm = e.match(/^([\w][\w.-]*)@origin$/);
+    if (rm) {
+      const ref = this.remote.get(rm[1]);
+      if (ref && this.changes.has(ref.id)) return ref.id;
+      throw new JJError(`Revision \`${e}\` doesn't exist`, 'That branch has not been pushed or fetched yet.');
+    }
+    if (this.bookmarks.has(e)) {
+      const val = this.bookmarks.get(e);
+      if (typeof val !== 'string') {
+        throw new JJError(`Bookmark ${e} is conflicted`, [
+          ...val.conflict.map(t => `Hint:   candidate: ${this._fmt(t, { noBookmarks: true })}`),
+          `Hint: Use \`jj bookmark set ${e} -r <rev>\` to resolve it first.`,
+        ]);
+      }
+      return val;
+    }
+    if (/^[k-z]+(\/\d)?$/.test(e)) {
+      const hits = [...this.changes.values()].filter(c => this._dispId(c).startsWith(e) || c.displayId.startsWith(e)).map(c => c.id);
       if (hits.length === 1) return hits[0];
-      if (hits.length > 1) throw new JJError(`Change ID prefix "${e}" is ambiguous`, 'Add more letters from the ID shown in the graph.');
+      if (hits.length > 1) {
+        const disp = [...new Set(hits.map(h => this.get(h).displayId))];
+        if (disp.length === 1) {
+          throw new JJError(`Change ID "${disp[0]}" is divergent — it resolved to multiple revisions`,
+            hits.map(h => `Hint:   ${this._fmt(h, { noBookmarks: true })}`).concat(
+              [`Hint: Pick a side with its suffixed ID (${hits.map(h => this._dispId(this.get(h))).join(', ')}), @, or a remote bookmark like feat@origin.`]));
+        }
+        throw new JJError(`Change ID prefix "${e}" is ambiguous`, 'Add more letters from the ID shown in the graph.');
+      }
     }
     throw new JJError(`Revision "${orig}" doesn't exist`, 'Use a change ID from the graph, a bookmark name, @, or suffixes like @-.');
   }
@@ -526,7 +570,7 @@ class JJEngine {
     return {
       wc: this.wc,
       changes: [...this.changes.values()].map(c => ({ ...c, parents: c.parents.slice(), files: JSON.parse(JSON.stringify(c.files)) })),
-      bookmarks: [...this.bookmarks],
+      bookmarks: [...this.bookmarks].map(([n, v]) => [n, typeof v === 'string' ? v : { conflict: [...v.conflict] }]),
       remote: [...this.remote].map(([n, r]) => [n, { ...r }]),
       fetchCount: this.fetchCount,
     };
@@ -534,7 +578,7 @@ class JJEngine {
 
   _restore(snap) {
     this.changes = new Map(snap.changes.map(c => [c.id, { ...c, parents: c.parents.slice(), files: JSON.parse(JSON.stringify(c.files)) }]));
-    this.bookmarks = new Map(snap.bookmarks);
+    this.bookmarks = new Map(snap.bookmarks.map(([n, v]) => [n, typeof v === 'string' ? v : { conflict: [...v.conflict] }]));
     this.remote = new Map((snap.remote || []).map(([n, r]) => [n, { ...r }]));
     this.fetchCount = snap.fetchCount || 0;
     this.wc = snap.wc;
@@ -741,6 +785,7 @@ class JJEngine {
     const ordered = [...set].sort((a, b) => row[b] - row[a]); // children first
     const replacement = new Map();
     const abandonedCids = [...set].map(id => this.get(id).commitId);
+    const deletedBookmarks = [];
     const wcWasAbandoned = set.has(this.wc);
     const oldWcParents = this.get(this.wc).parents.slice();
 
@@ -756,9 +801,17 @@ class JJEngine {
         kid.parents = np.length ? np : [ROOT_ID];
       }
       for (const name of this.bookmarksAt(x)) {
-        const to = xc.parents[0] || ROOT_ID;
-        this.bookmarks.set(name, to);
-        lines.push({ t: `Moved bookmark ${name} to ${this.short(to)}`, c: 'dim' });
+        const val = this.bookmarks.get(name);
+        if (typeof val !== 'string') {
+          // Real jj keeps the bookmark conflicted (against the tombstone)
+          // until you resolve it explicitly with `jj bookmark set`.
+          const rest = val.conflict.filter(t => t !== x);
+          if (rest.length) this.bookmarks.set(name, { conflict: rest });
+          else { this.bookmarks.delete(name); deletedBookmarks.push(name); }
+        } else {
+          this.bookmarks.delete(name);
+          deletedBookmarks.push(name);
+        }
       }
       replacement.set(x, xc.parents.slice());
       lines.unshift({ t: `  ${this._fmt(x, { noConflict: true })}`, c: '' });
@@ -768,11 +821,16 @@ class JJEngine {
 
     // Fix any bookmarks that cascaded onto a change abandoned later.
     for (const [name, target] of this.bookmarks) {
+      if (typeof target !== 'string') continue;
       let cur = target;
       while (replacement.has(cur)) cur = replacement.get(cur)[0] || ROOT_ID;
       if (cur !== target) this.bookmarks.set(name, cur);
     }
 
+    if (deletedBookmarks.length) {
+      lines.push({ t: `Deleted bookmarks: ${deletedBookmarks.join(', ')}`, c: 'dim' });
+      lines.push({ t: 'Hint: Deleted bookmarks can be pushed by name or all at once with `jj git push --deleted`.', c: 'dim' });
+    }
     const alive = [...touch].filter(id => this.changes.has(id));
     this._touch(alive);
     if (alive.length) lines.push({ t: `Rebased ${alive.length} descendant commits onto parents of abandoned commits`, c: 'dim' });
@@ -945,9 +1003,26 @@ class JJEngine {
     const nameOk = n => /^[A-Za-z][\w./-]*$/.test(n) && n !== 'root';
 
     if (sub === 'list' || sub === 'l') {
-      const lines = [...this.bookmarks.keys()].sort().map(name => ({
-        t: `${name}: ${this._fmt(this.bookmarks.get(name), { noBookmarks: true })}`, c: '',
-      }));
+      const lines = [];
+      let anyConflict = false;
+      for (const name of [...this.bookmarks.keys()].sort()) {
+        const val = this.bookmarks.get(name);
+        if (typeof val === 'string') {
+          lines.push({ t: `${name}: ${this._fmt(val, { noBookmarks: true })}`, c: '' });
+        } else {
+          anyConflict = true;
+          lines.push({ t: `${name} (conflicted):`, c: 'err' });
+          for (const t of val.conflict) lines.push({ t: `  + ${this._fmt(t, { noBookmarks: true })}`, c: '' });
+        }
+        const r = this.remote.get(name);
+        if (r && this.changes.has(r.id)) {
+          const cur = typeof val === 'string' ? val : null;
+          if (cur !== r.id || this.get(r.id).commitId !== r.commitId) {
+            lines.push({ t: `  @origin: ${this._fmt(r.id, { noBookmarks: true })}`, c: 'dim' });
+          }
+        }
+      }
+      if (anyConflict) lines.push({ t: 'Hint: Some bookmarks have conflicts. Use `jj bookmark set <name> -r <rev>` to resolve.', c: 'dim' });
       if (!lines.length) lines.push({ t: '(no bookmarks)', c: 'dim' });
       return { op: null, lines };
     }
@@ -962,7 +1037,8 @@ class JJEngine {
       const rev = flags.r ? this.resolve(flags.r) : this.wc;
       if (rev === ROOT_ID) throw new JJError('Cannot point a bookmark at the root commit');
       const existed = this.bookmarks.has(name);
-      if (existed && !create && !flags['allow-backwards']) {
+      const wasConflicted = existed && this._bookmarkConflicted(name);
+      if (existed && !create && !wasConflicted && !flags['allow-backwards']) {
         const old = this.bookmarks.get(name);
         if (old !== rev && !this.descendantsOf(old, true).has(rev)) {
           throw new JJError(`Refusing to move bookmark backwards or sideways: ${name}`,
@@ -987,7 +1063,7 @@ class JJEngine {
       if (this.bookmarks.get(name) === rev) {
         return { op: null, lines: [{ t: 'No bookmarks to update.', c: 'dim' }] };
       }
-      if (!flags['allow-backwards'] && !this.descendantsOf(this.bookmarks.get(name), true).has(rev)) {
+      if (!flags['allow-backwards'] && !this._bookmarkConflicted(name) && !this.descendantsOf(this.bookmarks.get(name), true).has(rev)) {
         throw new JJError(`Refusing to move bookmark backwards or sideways: ${name}`,
           'Use --allow-backwards to allow it.');
       }
@@ -1179,6 +1255,13 @@ class JJEngine {
     const trees = this.computeTrees();
     const changed = [];
     for (const name of names) {
+      if (this._bookmarkConflicted(name)) {
+        warnings.push(
+          { t: `Warning: Bookmark ${name} is conflicted`, c: 'dim' },
+          { t: 'Hint: Run `jj bookmark list` to inspect, and use `jj bookmark set` to fix it up.', c: 'dim' },
+        );
+        continue;
+      }
       const target = this.bookmarks.get(name);
       const cur = this.remote.get(name);
       if (cur && cur.id === target && cur.commitId === this.get(target).commitId) {
@@ -1234,8 +1317,28 @@ class JJEngine {
       const batch = this.remoteScript[this.fetchCount];
       this.fetchCount++;
       for (const ev of batch) {
+        if (ev.rewrite) {
+          // The remote rewrote one of your changes (e.g. a maintainer amended
+          // your PR commit): a sibling commit with the SAME change ID.
+          const target = [...this.changes.values()].find(c => c.displayId.startsWith(ev.rewrite));
+          if (!target) throw new JJError(`Remote rewrite target "${ev.rewrite}" not found`);
+          const trees = this.computeTrees();
+          const ptree = target.parents.length ? (trees.get(target.parents[0]) || {}) : {};
+          const files = {};
+          for (const [f, v] of Object.entries(ev.files || {})) {
+            let from = ptree[f] ?? null;
+            if (isConflict(from)) from = from.conflict.base;
+            files[f] = { from, to: v };
+          }
+          const node = this._createChange(target.parents, ev.desc ?? target.desc, files);
+          node.displayId = target.displayId;
+          node.divergentSeq = 0;
+          if (target.divergentSeq == null) target.divergentSeq = 1;
+          this.server.set(ev.on, { id: node.id, commitId: node.commitId });
+          continue;
+        }
         const cur = this.server.get(ev.on) || this.remote.get(ev.on);
-        const parentId = cur ? cur.id : this.bookmarks.get(ev.on);
+        const parentId = cur ? cur.id : this._bkTargets(this.bookmarks.get(ev.on) ?? '')[0];
         if (!parentId || !this.changes.has(parentId)) throw new JJError(`Remote has no branch "${ev.on}" to update`);
         const trees = this.computeTrees();
         const ptree = trees.get(parentId) || {};
@@ -1262,16 +1365,24 @@ class JJEngine {
           id: ref.id, commitId: ref.commitId, desc: ref.respawn.desc,
           parents: [ref.respawn.parentId], immutable: false,
           files: JSON.parse(JSON.stringify(ref.respawn.files)),
+          displayId: ref.id,
         });
       }
       if (!this.changes.has(ref.id)) continue;
-      const prevViewId = view ? view.id : null;
+      const prevView = view || null;
       this.remote.set(name, { id: ref.id, commitId: ref.commitId });
       lines.push({ t: `bookmark: ${name}@origin [updated] tracked`, c: 'ok' });
-      const local = this.bookmarks.get(name);
-      if (local !== ref.id && (local === prevViewId || (ref.respawn && local === ref.respawn.parentId))) {
+      const localVal = this.bookmarks.get(name);
+      if (localVal === undefined || typeof localVal !== 'string' || localVal === ref.id) continue;
+      const localC = this.get(localVal);
+      const unchangedSinceSync = prevView && localVal === prevView.id && localC && localC.commitId === prevView.commitId;
+      const freshParent = ref.respawn && localVal === ref.respawn.parentId;
+      if (unchangedSinceSync || freshParent) {
         this.bookmarks.set(name, ref.id);
         lines.push({ t: `(local bookmark ${name} tracked the update and moved along)`, c: 'dim' });
+      } else {
+        // Both sides moved: the local bookmark becomes conflicted (name??).
+        this.bookmarks.set(name, { conflict: [localVal, ref.id] });
       }
     }
     if (!lines.length) return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
@@ -1542,7 +1653,9 @@ class JJEngine {
 
   getState() {
     const bookmarks = {};
-    for (const [name, target] of this.bookmarks) bookmarks[name] = target;
+    for (const [name, val] of this.bookmarks) {
+      bookmarks[name] = typeof val === 'string' ? val : { conflict: [...val.conflict] };
+    }
     const remoteBookmarks = {};
     for (const [name, ref] of this.remote) {
       if (!this.changes.has(ref.id)) continue;
@@ -1563,6 +1676,8 @@ class JJEngine {
           conflicted: Object.values(tree).some(isConflict),
           immutable: immutable.has(c.id),
           hasFiles: Object.keys(c.files).length > 0,
+          dispId: this._dispId(c),
+          divergent: this._divergentIds(c.displayId).length > 1,
         };
       }),
       wc: this.wc,
@@ -1580,7 +1695,11 @@ function analyzeState(state, opts = {}) {
   const checkWC = opts.checkWC !== false;
   const byId = new Map(state.changes.map(c => [c.id, c]));
   const bkAt = {};
-  for (const [name, target] of Object.entries(state.bookmarks)) (bkAt[target] = bkAt[target] || []).push(name);
+  for (const [name, val] of Object.entries(state.bookmarks)) {
+    const conflicted = typeof val !== 'string';
+    const targets = conflicted ? val.conflict : [val];
+    for (const t of targets) (bkAt[t] = bkAt[t] || []).push(name + (conflicted ? '??' : ''));
+  }
   for (const k of Object.keys(bkAt)) bkAt[k].sort();
   const rbAt = {};
   for (const [name, ref] of Object.entries(state.remoteBookmarks || {})) {

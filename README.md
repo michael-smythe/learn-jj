@@ -8,11 +8,12 @@ in a terminal, watch the change graph respond, match the goal state to clear eac
 
 ## What it teaches
 
-31 levels across 11 sequences:
+34 levels across 11 sequences:
 
 1. **The Basics** — the working copy as a commit (`@`), `describe`, `new`, `commit`,
    `squash`, `abandon`, and automatic descendant rebasing.
-2. **Bookmarks** — `bookmark create/set`, and why they don't move on their own.
+2. **Bookmarks** — `bookmark create/set`, why they don't move on their own, and the
+   anonymous-heads workflow (name things only when they leave your machine).
 3. **Moving Work Around** — `rebase -s`, `rebase -r` (commit extraction), merges via
    `jj new` with multiple parents.
 4. **Superpowers** — the operation log and `jj undo`, `jj new -B` insertion, and a
@@ -30,8 +31,10 @@ in a terminal, watch the change graph respond, match the goal state to clear eac
 9. **History Surgery II** — `jj absorb` (auto-amend into the right ancestors),
    `jj split` by paths, and backporting with `jj duplicate` + rebase.
 10. **The jj ⨯ git Field Guide** — why `jj undo` cannot un-push (the op log is
-    local; fetch proves it), and colocated-repo survival: detached HEAD is normal,
-    read-only git is safe, history-rewriting git commands are not.
+    local; fetch proves it); colocated-repo survival: detached HEAD is normal,
+    read-only git is safe, history-rewriting git commands are not; bookmark
+    conflicts (`main??`) when both sides move a branch; and divergent changes
+    (`??`, two commits sharing a change ID) with the pick-a-side recovery.
 11. **Graduation** — a full day: fetch, rebase onto a moved trunk, resolve the
     conflict at the source, absorb a review fix, push.
 

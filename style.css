@@ -147,6 +147,10 @@ body.sandbox #goalPane { display: none; }
 .conflictBadge circle { fill: var(--red); }
 .conflictBadge text { fill: #0d1017; font-weight: 800; font-size: 13px; }
 .immuMark { fill: #565f89; font-size: 9px; }
+.nodeIdHi.divergent { fill: var(--red); }
+.divergentMark { fill: var(--red); font-weight: 700; }
+.bookmarkChip.conflicted rect { stroke: var(--red); fill: color-mix(in srgb, var(--red) 14%, var(--panel)); }
+.bookmarkChip.conflicted text { fill: var(--red); }
 
 /* ---------------- modals ---------------- */
 .overlay {

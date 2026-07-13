@@ -143,6 +143,32 @@ const LEVELS = [
     solution: ['jj commit -m "C"', 'jj bookmark set main -r @-'],
   },
 
+  {
+    id: 'bookmarks-3', seq: 'bookmarks', title: 'You don\'t need branches',
+    cards: [
+      `<p>A git reflex: "I'm trying three approaches, so I need three branches."
+       In jj you just… have three heads. No names, no ceremony — <strong>anonymous
+       branches</strong> are a first-class workflow.</p>
+       <p>Nothing is lost or dangling: every head is visible in the graph and
+       <code>jj log</code>, addressable by its change ID. (In real jj, revsets like
+       <code>heads(all())</code> or <code>mine()</code> list them; the log shows them
+       by default.)</p>
+       <p>Name things only when they leave your machine: a bookmark exists to become
+       a git branch on origin. The parser and docs experiments below can stay nameless
+       forever — the cache experiment won, so build on it, then bookmark and push
+       <em>just that</em>.</p>`,
+    ],
+    objective: 'Continue the cache experiment with a change "cache: tune eviction" on top of it, then bookmark it "cache" and push.',
+    hint: 'jj new kn -m "cache: tune eviction" · jj bookmark create cache · jj git push -b cache',
+    start: [
+      'jj commit -m "A: base"', 'jj bookmark create main -r @-', 'jj git push -b main',
+      'jj new main -m "wip: parser"',
+      'jj new main -m "wip: cache"',
+      'jj new main -m "wip: docs"',
+    ],
+    solution: ['jj new kn -m "cache: tune eviction"', 'jj bookmark create cache', 'jj git push -b cache'],
+  },
+
   /* ------------------------------------------------ rebase ---- */
   {
     id: 'rebase-1', seq: 'rebase', title: 'Rebase a stack',
@@ -621,6 +647,66 @@ const LEVELS = [
       'echo wip > feature.js',
     ],
     solution: ['jj describe -m "F: feature"', 'jj bookmark create feature'],
+  },
+
+  {
+    id: 'fieldguide-3', seq: 'fieldguide', title: 'Bookmark conflict (main??)',
+    cards: [
+      `<p>You moved <code>main</code> to your local change. Meanwhile a teammate pushed
+       <em>their</em> commit to origin's main. Two owners, one name — after
+       <code>jj git fetch</code>, jj refuses to guess: the bookmark becomes
+       <strong>conflicted</strong>, shown as <code>main??</code> on <em>both</em>
+       candidates.</p>
+       <p>Nothing is blocking (of course). But pushing a conflicted bookmark is refused,
+       and <code>jj bookmark list</code> shows the sides plus the hint you need.</p>`,
+      `<p>Resolution is one decisive move — point the name where you say it belongs:</p>
+       <p><code>jj bookmark set main -r @</code> (conflicted bookmarks skip the
+       backwards-guard: resolving <em>is</em> the point).</p>
+       <p>Then <code>jj git push</code> moves origin sideways to your side —
+       force-with-lease semantics, and the teammate's commit itself stays in the repo
+       (you can merge or rebase it next; only the <em>name</em> was contested).
+       git equivalent: a diverged branch after fetch, minus the detached-HEAD panic.</p>`,
+    ],
+    objective: 'Fetch (main becomes conflicted), resolve main to your local change, and push.',
+    hint: 'jj git fetch · jj bookmark list · jj bookmark set main -r @ · jj git push',
+    start: [
+      'jj commit -m "A: base"', 'jj bookmark create main -r @-', 'jj git push -b main',
+      'jj new main -m "local: adjust config"',
+      'jj bookmark set main -r @',
+    ],
+    remote: [[{ on: 'main', desc: 'teammate: hotfix', files: { 'hotfix.txt': 'fix' } }]],
+    solution: ['jj git fetch', 'jj bookmark set main -r @', 'jj git push'],
+  },
+  {
+    id: 'fieldguide-4', seq: 'fieldguide', title: 'Divergent changes (??)',
+    cards: [
+      `<p>The deepest cut in jj's model: a <strong>change ID with two live commits</strong>.
+       It happens when the same change is rewritten in two places — here, a maintainer
+       amended your PR commit on origin while you also amended it locally. After
+       <code>jj git fetch</code>: both versions visible, IDs shown as
+       <code>kk/0</code> and <code>kk/1</code>, marked <code>(divergent)</code>,
+       and the bookmark conflicted too.</p>
+       <p>Try <code>jj abandon kk</code> — jj refuses: the ID is ambiguous now.
+       That error is your map: address a side by its suffixed ID, by <code>@</code>,
+       or by a remote name like <code>feat@origin</code>.</p>`,
+      `<p>Recovery is: <strong>pick a side, drop the other, repoint the name.</strong>
+       Here the maintainer's version wins:</p>
+       <p>1. <code>jj abandon @</code> — drop your local copy (divergence gone).<br>
+       2. <code>jj bookmark set feat -r feat@origin</code> — resolve the bookmark.<br>
+       3. <code>jj new feat</code> — carry on, on top of their version.</p>
+       <p>(Real jj also has <code>jj evolog</code> to inspect how each side evolved —
+       useful before choosing. And if both sides have work you need, don't abandon:
+       squash one into the other.)</p>`,
+    ],
+    objective: 'Fetch (the change diverges), keep the maintainer\'s side: abandon yours, resolve feat to feat@origin, and start a new change on top.',
+    hint: 'jj git fetch · jj abandon @ · jj bookmark set feat -r feat@origin · jj new feat',
+    start: [
+      'jj describe -m "fix: retry logic"', 'echo v1 > retry.js',
+      'jj bookmark create feat', 'jj git push -b feat',
+      'echo v2 > retry.js',
+    ],
+    remote: [[{ on: 'feat', rewrite: 'kk', desc: 'fix: retry logic', files: { 'retry.js': 'maintainer' } }]],
+    solution: ['jj git fetch', 'jj abandon @', 'jj bookmark set feat -r feat@origin', 'jj new feat'],
   },
 
   /* --------------------------------------------------- grad ---- */

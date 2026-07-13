@@ -24,6 +24,8 @@ const SEED = 777;
 // Scripted "colleague" activity matching the git steps in remote scenarios.
 const REMOTE_SCRIPTS = {
   'remote-fetch': [[{ on: 'main', desc: 'teammate: hotfix', files: { 'hotfix.txt': 'fix' } }]],
+  'bookmark-conflict': [[{ on: 'main', desc: 'teammate: hotfix', files: { 'hotfix.txt': 'fix' } }]],
+  'divergent-change': [[{ on: 'feat', rewrite: 'kk', desc: 'fix: retry logic', files: { 'retry.js': 'maintainer' } }]],
 };
 
 // Lines of real output the simulator does not (or cannot) mirror.
@@ -33,6 +35,10 @@ const IGNORE = [
   /^Hint: For more information, see:/,     // doc URLs
   /^      - /,
   /^Hint: Rejected commit: «c» «h» \(no description set\)$/, // wc summary drift
+  /@git/,                                  // git-backend tracking ref isn't modelled
+  /^  - /,                                 // conflicted-bookmark tombstone entries
+  /^  @origin \(/,                        // (ahead/behind by N) decorations
+  /\(hidden\)/,
 ];
 
 // Steps checked for outcome only (playground intentionally differs).
@@ -55,8 +61,11 @@ function normalize(text) {
 function toSimCommand(cmd) {
   if (cmd.startsWith('sh: ')) {
     const body = cmd.slice(4);
+    // Compound / git commands are the fake colleague's plumbing — the
+    // remote scripts model those; only simple file ops replay in the sim.
+    if (body.includes('&&') || body.startsWith('git ')) return null;
     if (body.startsWith('echo ') || body.startsWith('cat ') || body.startsWith('rm ') || body === 'ls') return body;
-    return null; // git plumbing for the fake colleague — handled by remote scripts
+    return null;
   }
   return cmd;
 }

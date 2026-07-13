@@ -1,6 +1,6 @@
 {
   "version": "jj 0.43.0",
-  "generated": "2026-07-13T02:57:21.285Z",
+  "generated": "2026-07-13T03:14:19.988Z",
   "scenarios": [
     {
       "name": "basics-describe-new",
@@ -8,25 +8,25 @@
         {
           "cmd": "jj st",
           "exit": 0,
-          "stdout": "The working copy has no changes.\nWorking copy  (@) : ztxwooyz 5d6f1a71 (empty) (no description set)\nParent commit (@-): zzzzzzzz 00000000 (empty) (no description set)\n",
+          "stdout": "The working copy has no changes.\nWorking copy  (@) : znslrwpk 8b8e376b (empty) (no description set)\nParent commit (@-): zzzzzzzz 00000000 (empty) (no description set)\n",
           "stderr": ""
         },
         {
           "cmd": "jj describe -m \"A\"",
           "exit": 0,
           "stdout": "",
-          "stderr": "Working copy  (@) now at: ztxwooyz ab060ca1 (empty) A\nParent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)\n"
+          "stderr": "Working copy  (@) now at: znslrwpk b744bbfe (empty) A\nParent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)\n"
         },
         {
           "cmd": "jj new",
           "exit": 0,
           "stdout": "",
-          "stderr": "Working copy  (@) now at: prtyvxss 66218dd9 (empty) (no description set)\nParent commit (@-)      : ztxwooyz ab060ca1 (empty) A\n"
+          "stderr": "Working copy  (@) now at: qqnulwlx 666271da (empty) (no description set)\nParent commit (@-)      : znslrwpk b744bbfe (empty) A\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  prtyvxss learn@example.com 2026-07-12 22:57:13 66218dd9\n│  (empty) (no description set)\n○  ztxwooyz learn@example.com 2026-07-12 22:57:13 ab060ca1\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  qqnulwlx learn@example.com 2026-07-12 23:14:11 666271da\n│  (empty) (no description set)\n○  znslrwpk learn@example.com 2026-07-12 23:14:11 b744bbfe\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -38,18 +38,18 @@
           "cmd": "jj commit -m \"A\"",
           "exit": 0,
           "stdout": "",
-          "stderr": "Working copy  (@) now at: otltmwyv 5ae8e112 (empty) (no description set)\nParent commit (@-)      : yrpxnykw 045eb873 (empty) A\n"
+          "stderr": "Working copy  (@) now at: wwwmmwps 4d1894cb (empty) (no description set)\nParent commit (@-)      : qwlsmkku 2ee91309 (empty) A\n"
         },
         {
           "cmd": "jj commit -m \"B\"",
           "exit": 0,
           "stdout": "",
-          "stderr": "Working copy  (@) now at: uwsopwxv 8365a832 (empty) (no description set)\nParent commit (@-)      : otltmwyv 0351684f (empty) B\n"
+          "stderr": "Working copy  (@) now at: omktkpqz 97bf0ce9 (empty) (no description set)\nParent commit (@-)      : wwwmmwps 8d3f9528 (empty) B\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  uwsopwxv learn@example.com 2026-07-12 22:57:13 8365a832\n│  (empty) (no description set)\n○  otltmwyv learn@example.com 2026-07-12 22:57:13 0351684f\n│  (empty) B\n○  yrpxnykw learn@example.com 2026-07-12 22:57:13 045eb873\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  omktkpqz learn@example.com 2026-07-12 23:14:11 97bf0ce9\n│  (empty) (no description set)\n○  wwwmmwps learn@example.com 2026-07-12 23:14:11 8d3f9528\n│  (empty) B\n○  qwlsmkku learn@example.com 2026-07-12 23:14:11 2ee91309\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -69,12 +69,12 @@
           "cmd": "jj new subject(\"A\") -m \"C\"",
           "exit": 0,
           "stdout": "",
-          "stderr": "Working copy  (@) now at: vlpwkvrz 4d62c418 (empty) C\nParent commit (@-)      : vrxxozzq e7d5da2b (empty) A\n"
+          "stderr": "Working copy  (@) now at: qztqklkm 6f78d955 (empty) C\nParent commit (@-)      : kkwxvksl 8b44715f (empty) A\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  vlpwkvrz learn@example.com 2026-07-12 22:57:14 4d62c418\n│  (empty) C\n│ ○  upwqtvsk learn@example.com 2026-07-12 22:57:13 c50c40d4\n├─╯  (empty) B\n○  vrxxozzq learn@example.com 2026-07-12 22:57:13 e7d5da2b\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  qztqklkm learn@example.com 2026-07-12 23:14:11 6f78d955\n│  (empty) C\n│ ○  vtxzysql learn@example.com 2026-07-12 23:14:11 327d7844\n├─╯  (empty) B\n○  kkwxvksl learn@example.com 2026-07-12 23:14:11 8b44715f\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -98,12 +98,12 @@
           "cmd": "jj squash -r subject(\"B\")",
           "exit": 0,
           "stdout": "",
-          "stderr": "Rebased 2 descendant commits\nWorking copy  (@) now at: wnmznwmy da4d7ab8 (empty) (no description set)\nParent commit (@-)      : wvxokozq 3e40f665 (empty) C\n"
+          "stderr": "Rebased 2 descendant commits\nWorking copy  (@) now at: qytonnys 9e461f55 (empty) (no description set)\nParent commit (@-)      : qlluxwrl 2c02ba09 (empty) C\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  wnmznwmy learn@example.com 2026-07-12 22:57:14 da4d7ab8\n│  (empty) (no description set)\n○  wvxokozq learn@example.com 2026-07-12 22:57:14 3e40f665\n│  (empty) C\n○  rxxtoulk learn@example.com 2026-07-12 22:57:14 c6833c1b\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  qytonnys learn@example.com 2026-07-12 23:14:12 9e461f55\n│  (empty) (no description set)\n○  qlluxwrl learn@example.com 2026-07-12 23:14:12 2c02ba09\n│  (empty) C\n○  pypkwsxp learn@example.com 2026-07-12 23:14:12 594bfe81\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -127,12 +127,12 @@
           "cmd": "jj abandon subject(\"experiment\")",
           "exit": 0,
           "stdout": "",
-          "stderr": "Abandoned 1 commits:\n  yzzrusyr c31e5878 (empty) experiment\nRebased 2 descendant commits onto parents of abandoned commits\nWorking copy  (@) now at: wpvtrwsy e505a270 (empty) (no description set)\nParent commit (@-)      : nvxsrzun 96875f98 (empty) B\n"
+          "stderr": "Abandoned 1 commits:\n  zvnzqkyy 17fbe6a9 (empty) experiment\nRebased 2 descendant commits onto parents of abandoned commits\nWorking copy  (@) now at: ruptvnlz d199b258 (empty) (no description set)\nParent commit (@-)      : xtkkstkl 3d0d72d4 (empty) B\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  wpvtrwsy learn@example.com 2026-07-12 22:57:14 e505a270\n│  (empty) (no description set)\n○  nvxsrzun learn@example.com 2026-07-12 22:57:14 96875f98\n│  (empty) B\n○  qsywrrnp learn@example.com 2026-07-12 22:57:14 870fcfc9\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  ruptvnlz learn@example.com 2026-07-12 23:14:12 d199b258\n│  (empty) (no description set)\n○  xtkkstkl learn@example.com 2026-07-12 23:14:12 3d0d72d4\n│  (empty) B\n○  vzvsklzu learn@example.com 2026-07-12 23:14:12 fbc81cea\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -164,12 +164,12 @@
           "cmd": "jj rebase -s subject(\"C\") -d main",
           "exit": 0,
           "stdout": "",
-          "stderr": "Rebased 2 commits to destination\nWorking copy  (@) now at: qzzyxlpt 5e0d215b (empty) D\nParent commit (@-)      : zkzntzyy ed879078 (empty) C\n"
+          "stderr": "Rebased 2 commits to destination\nWorking copy  (@) now at: yponkrtp d554dc87 (empty) D\nParent commit (@-)      : zznqxmys 8553fd64 (empty) C\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  qzzyxlpt learn@example.com 2026-07-12 22:57:15 5e0d215b\n│  (empty) D\n○  zkzntzyy learn@example.com 2026-07-12 22:57:15 ed879078\n│  (empty) C\n○  zxymzlnx learn@example.com 2026-07-12 22:57:14 main 218ddfb4\n│  (empty) B\n○  qprwwvzy learn@example.com 2026-07-12 22:57:14 c060b2cc\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  yponkrtp learn@example.com 2026-07-12 23:14:12 d554dc87\n│  (empty) D\n○  zznqxmys learn@example.com 2026-07-12 23:14:12 8553fd64\n│  (empty) C\n○  solkuvwt learn@example.com 2026-07-12 23:14:12 main 69dde2a9\n│  (empty) B\n○  yqyztlks learn@example.com 2026-07-12 23:14:12 f788f071\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -197,12 +197,12 @@
           "cmd": "jj rebase -r subject(\"B\") -d subject(\"D\")",
           "exit": 0,
           "stdout": "",
-          "stderr": "Rebased 1 commits to destination\nRebased 3 descendant commits\nWorking copy  (@) now at: zupvqqyn 41a583ca (empty) (no description set)\nParent commit (@-)      : qnonpkyz 5172fe1b (empty) D\n"
+          "stderr": "Rebased 1 commits to destination\nRebased 3 descendant commits\nWorking copy  (@) now at: otnwxvvk 93d83fa7 (empty) (no description set)\nParent commit (@-)      : ussyltzm 49a4b929 (empty) D\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  zupvqqyn learn@example.com 2026-07-12 22:57:15 41a583ca\n│  (empty) (no description set)\n│ ○  norwlqqt learn@example.com 2026-07-12 22:57:15 b1abed05\n├─╯  (empty) B\n○  qnonpkyz learn@example.com 2026-07-12 22:57:15 5172fe1b\n│  (empty) D\n○  pzzwyylp learn@example.com 2026-07-12 22:57:15 fc656f49\n│  (empty) C\n○  swkvzvkw learn@example.com 2026-07-12 22:57:15 e29e1002\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  otnwxvvk learn@example.com 2026-07-12 23:14:13 93d83fa7\n│  (empty) (no description set)\n│ ○  vzxmwwyn learn@example.com 2026-07-12 23:14:13 2eaee4a7\n├─╯  (empty) B\n○  ussyltzm learn@example.com 2026-07-12 23:14:13 49a4b929\n│  (empty) D\n○  vlrrkzsy learn@example.com 2026-07-12 23:14:13 784cb154\n│  (empty) C\n○  tzlqksmy learn@example.com 2026-07-12 23:14:13 c573f2d2\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -226,12 +226,12 @@
           "cmd": "jj new subject(\"B\") subject(\"C\") -m \"M\"",
           "exit": 0,
           "stdout": "",
-          "stderr": "Working copy  (@) now at: rtusuusu 453607bc (empty) M\nParent commit (@-)      : ptvktrsk 40937f00 (empty) B\nParent commit (@-)      : styprlnx 89f7379d (empty) C\n"
+          "stderr": "Working copy  (@) now at: lrruxkwq dfebc1b2 (empty) M\nParent commit (@-)      : pwtmovrn 4194670d (empty) B\nParent commit (@-)      : opvvnnwv 3186034f (empty) C\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@    rtusuusu learn@example.com 2026-07-12 22:57:15 453607bc\n├─╮  (empty) M\n│ ○  styprlnx learn@example.com 2026-07-12 22:57:15 89f7379d\n│ │  (empty) C\n○ │  ptvktrsk learn@example.com 2026-07-12 22:57:15 40937f00\n├─╯  (empty) B\n○  lnklqmmv learn@example.com 2026-07-12 22:57:15 c85bbe80\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@    lrruxkwq learn@example.com 2026-07-12 23:14:13 dfebc1b2\n├─╮  (empty) M\n│ ○  opvvnnwv learn@example.com 2026-07-12 23:14:13 3186034f\n│ │  (empty) C\n○ │  pwtmovrn learn@example.com 2026-07-12 23:14:13 4194670d\n├─╯  (empty) B\n○  nltqntwx learn@example.com 2026-07-12 23:14:13 b8e36933\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         },
         {
@@ -257,7 +257,7 @@
           "cmd": "jj bookmark create main -r subject(\"B\")",
           "exit": 0,
           "stdout": "",
-          "stderr": "Created 1 bookmarks pointing to vxyvryxk cf8dee8c main | (empty) B\n"
+          "stderr": "Created 1 bookmarks pointing to llztlxky ce632799 main | (empty) B\n"
         },
         {
           "cmd": "jj bookmark create main -r subject(\"A\")",
@@ -280,7 +280,7 @@
         {
           "cmd": "jj bookmark list",
           "exit": 0,
-          "stdout": "main: vxyvryxk cf8dee8c (empty) B\n",
+          "stdout": "main: llztlxky ce632799 (empty) B\n",
           "stderr": ""
         },
         {
@@ -312,36 +312,36 @@
           "cmd": "jj abandon subject(\"B\")",
           "exit": 0,
           "stdout": "",
-          "stderr": "Abandoned 1 commits:\n  npqmlokp 8a0bfc28 (empty) B\nRebased 1 descendant commits onto parents of abandoned commits\nWorking copy  (@) now at: puvlsytt 7debd2f8 (empty) (no description set)\nParent commit (@-)      : xtzvrntl 57699dff (empty) A\n"
+          "stderr": "Abandoned 1 commits:\n  oowuqqkp 5bf544a7 (empty) B\nRebased 1 descendant commits onto parents of abandoned commits\nWorking copy  (@) now at: osvzkmxl 437ff46d (empty) (no description set)\nParent commit (@-)      : uwuumvpm 382fff76 (empty) A\n"
         },
         {
           "cmd": "jj undo",
           "exit": 0,
           "stdout": "",
-          "stderr": "Undid operation: 2eb6cccc0fee (2026-07-12 22:57:16) abandon commit 8a0bfc2845f28ddc92c12158eacf3d9740fc134b\nRestored to operation: 301cb92df24a (2026-07-12 22:57:16) commit d7544f7326ba4eeb3fbd87f187bbcdb5093b4fdf\nWorking copy  (@) now at: puvlsytt dd92b76b (empty) (no description set)\nParent commit (@-)      : npqmlokp 8a0bfc28 (empty) B\n"
+          "stderr": "Undid operation: b5e519bce01a (2026-07-12 23:14:14) abandon commit 5bf544a70f2a5b9bd640a5e29a6a8d838119892d\nRestored to operation: 71541f957805 (2026-07-12 23:14:14) commit a6c50027095b17e5c78814374bd9c083d1134bf8\nWorking copy  (@) now at: osvzkmxl 5af096af (empty) (no description set)\nParent commit (@-)      : oowuqqkp 5bf544a7 (empty) B\n"
         },
         {
           "cmd": "jj undo",
           "exit": 0,
           "stdout": "",
-          "stderr": "Undid operation: 301cb92df24a (2026-07-12 22:57:16) commit d7544f7326ba4eeb3fbd87f187bbcdb5093b4fdf\nRestored to operation: 3ce7b766750c (2026-07-12 22:57:16) commit b6ef2e1d0aba01c5a1bc91673555515d2c6a32a2\nWorking copy  (@) now at: npqmlokp d7544f73 (empty) (no description set)\nParent commit (@-)      : xtzvrntl 57699dff (empty) A\n"
+          "stderr": "Undid operation: 71541f957805 (2026-07-12 23:14:14) commit a6c50027095b17e5c78814374bd9c083d1134bf8\nRestored to operation: 727467fc0d89 (2026-07-12 23:14:14) commit 9c566d474dd0da58f1beca4eb5c34b1a99f7987a\nWorking copy  (@) now at: oowuqqkp a6c50027 (empty) (no description set)\nParent commit (@-)      : uwuumvpm 382fff76 (empty) A\n"
         },
         {
           "cmd": "jj undo",
           "exit": 0,
           "stdout": "",
-          "stderr": "Undid operation: 3ce7b766750c (2026-07-12 22:57:16) commit b6ef2e1d0aba01c5a1bc91673555515d2c6a32a2\nRestored to operation: aac6008233e5 (2026-07-12 22:57:16) add workspace 'default'\nWorking copy  (@) now at: xtzvrntl b6ef2e1d (empty) (no description set)\nParent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)\n"
+          "stderr": "Undid operation: 727467fc0d89 (2026-07-12 23:14:14) commit 9c566d474dd0da58f1beca4eb5c34b1a99f7987a\nRestored to operation: 6ef7905eff20 (2026-07-12 23:14:14) add workspace 'default'\nWorking copy  (@) now at: uwuumvpm 9c566d47 (empty) (no description set)\nParent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)\n"
         },
         {
           "cmd": "jj op log --limit 6",
           "exit": 0,
-          "stdout": "@  4f4fddd6360a michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 9 milliseconds\n│  undo: restore to operation aac6008233e58f19709f1d1c8b91f0a8b0d50f39aed22faa78a8d207320a0df2c63642eb2b2e2bfb69ae042b1adeea1b7f4397cd984c45536caee2c802a7b8e6\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' undo\n○  8b2aa8c12b4c michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 9 milliseconds\n│  undo: restore to operation 3ce7b766750c6f3c662412cad9cf457466db8fac4f4d2509424cca3cb887fe6c35592d148990e2d5a549ef2342af5557e0e1c0521e32234b03d445848d553462\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' undo\n○  0a40f37d61d2 michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 8 milliseconds\n│  undo: restore to operation 301cb92df24ae8bf0c4e6394781d54a44ae4d88c15bae003df8aea1a9f702ce626664d7c927352d2191471bf4a35352bd1fd24368f65796a9402cc372f81be4a\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' undo\n○  2eb6cccc0fee michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 14 milliseconds\n│  abandon commit 8a0bfc2845f28ddc92c12158eacf3d9740fc134b\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' abandon 'subject(B)'\n○  301cb92df24a michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 19 milliseconds\n│  commit d7544f7326ba4eeb3fbd87f187bbcdb5093b4fdf\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' commit -m B\n○  3ce7b766750c michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 17 milliseconds\n│  commit b6ef2e1d0aba01c5a1bc91673555515d2c6a32a2\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' commit -m A\n",
+          "stdout": "@  7c47cf848d97 michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 7 milliseconds\n│  undo: restore to operation 6ef7905eff209a05bf0268b2c4264e862f554c4a30f93d535996cb29b5a99f86154801e155af54f64888fd2039f1e89478db858b7b10dd3c7cca80c86a5587b5\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' undo\n○  6ead4dce24e0 michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 8 milliseconds\n│  undo: restore to operation 727467fc0d895d28e0223fbac793ece36f4ffbd7ce04a7837333865fa5ff4149b5a49a2f3c4e6ab01cdea25b1eaa69940d4d4507fb02c427ba97acc0ad155b5c\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' undo\n○  1c7ffd069881 michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 6 milliseconds\n│  undo: restore to operation 71541f957805071af5bc5c072ebf175ec0ac1f9c4e688ec9048f5b21a39c6a91930ea259d4b43d2870c54e7193b569476aaefe20607f94e2a37508a92a3dce88\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' undo\n○  b5e519bce01a michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 14 milliseconds\n│  abandon commit 5bf544a70f2a5b9bd640a5e29a6a8d838119892d\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' abandon 'subject(B)'\n○  71541f957805 michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 16 milliseconds\n│  commit a6c50027095b17e5c78814374bd9c083d1134bf8\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' commit -m B\n○  727467fc0d89 michaelsmythe@Michaels-MacBook-Pro.local default@ now, lasted 19 milliseconds\n│  commit 9c566d474dd0da58f1beca4eb5c34b1a99f7987a\n│  args: jj --color never --config 'user.name=\"Learn JJ\"' --config 'user.email=\"learn@example.com\"' --config 'ui.paginate=\"never\"' --config 'ui.editor=\"true\"' commit -m A\n",
           "stderr": ""
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  xtzvrntl learn@example.com 2026-07-12 22:57:16 b6ef2e1d\n│  (empty) (no description set)\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  uwuumvpm learn@example.com 2026-07-12 23:14:14 9c566d47\n│  (empty) (no description set)\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -419,12 +419,12 @@
           "cmd": "jj duplicate subject(\"B\")",
           "exit": 0,
           "stdout": "",
-          "stderr": "Duplicated 451d4904bc16 as nmmklqqw 237cd6e6 (empty) B\n"
+          "stderr": "Duplicated e7107ba59d16 as mkxkvyvz e18de6a9 (empty) B\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  yvntxsnl learn@example.com 2026-07-12 22:57:17 9e2585fd\n│  (empty) (no description set)\n○  mwmxyyoq learn@example.com 2026-07-12 22:57:17 451d4904\n│  (empty) B\n│ ○  nmmklqqw learn@example.com 2026-07-12 22:57:17 237cd6e6\n├─╯  (empty) B\n○  pyyqlvow learn@example.com 2026-07-12 22:57:16 d2579112\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  nnzmzntr learn@example.com 2026-07-12 23:14:14 f4ad7b0f\n│  (empty) (no description set)\n○  uyozorrq learn@example.com 2026-07-12 23:14:14 e7107ba5\n│  (empty) B\n│ ○  mkxkvyvz learn@example.com 2026-07-12 23:14:14 e18de6a9\n├─╯  (empty) B\n○  qxklrrno learn@example.com 2026-07-12 23:14:14 eea0d608\n│  (empty) A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -466,24 +466,24 @@
           "cmd": "jj rebase -s subject(\"C\") -d subject(\"B\")",
           "exit": 0,
           "stdout": "",
-          "stderr": "Rebased 1 commits to destination\nWorking copy  (@) now at: nruzrxnw 680f5d21 (conflict) C\nParent commit (@-)      : sylxlmks 33dbd6d4 B\nAdded 0 files, modified 1 files, removed 0 files\nWarning: There are unresolved conflicts at these paths:\nfruit.txt    2-sided conflict\nNew conflicts appeared in 1 commits:\n  nruzrxnw 680f5d21 (conflict) C\nHint: To resolve the conflicts, start by creating a commit on top of\nthe conflicted commit:\n  jj new nruzrxnw\nThen use `jj resolve`, or edit the conflict markers in the file directly.\nOnce the conflicts are resolved, you can inspect the result with `jj diff`.\nThen run `jj squash` to move the resolution into the conflicted commit.\n"
+          "stderr": "Rebased 1 commits to destination\nWorking copy  (@) now at: rxvrvxyv 835bc062 (conflict) C\nParent commit (@-)      : kllnlplk 2f0b0c56 B\nAdded 0 files, modified 1 files, removed 0 files\nWarning: There are unresolved conflicts at these paths:\nfruit.txt    2-sided conflict\nNew conflicts appeared in 1 commits:\n  rxvrvxyv 835bc062 (conflict) C\nHint: To resolve the conflicts, start by creating a commit on top of\nthe conflicted commit:\n  jj new rxvrvxyv\nThen use `jj resolve`, or edit the conflict markers in the file directly.\nOnce the conflicts are resolved, you can inspect the result with `jj diff`.\nThen run `jj squash` to move the resolution into the conflicted commit.\n"
         },
         {
           "cmd": "jj st",
           "exit": 0,
-          "stdout": "Working copy changes:\nM fruit.txt\nWorking copy  (@) : nruzrxnw 680f5d21 (conflict) C\nParent commit (@-): sylxlmks 33dbd6d4 B\nWarning: There are unresolved conflicts at these paths:\nfruit.txt    2-sided conflict\n",
+          "stdout": "Working copy changes:\nM fruit.txt\nWorking copy  (@) : rxvrvxyv 835bc062 (conflict) C\nParent commit (@-): kllnlplk 2f0b0c56 B\nWarning: There are unresolved conflicts at these paths:\nfruit.txt    2-sided conflict\n",
           "stderr": ""
         },
         {
           "cmd": "sh: cat fruit.txt",
           "exit": 0,
-          "stdout": "<<<<<<< conflict 1 of 1\n%%%%%%% diff from: rmoukmky 226abbc5 \"A\" (parents of rebased revision)\n\\\\\\\\\\\\\\        to: sylxlmks 33dbd6d4 \"B\" (rebase destination)\n-apples\n+bananas\n+++++++ nruzrxnw 197c6c85 \"C\" (rebased revision)\ncherries\n>>>>>>> conflict 1 of 1 ends\n",
+          "stdout": "<<<<<<< conflict 1 of 1\n%%%%%%% diff from: tkzmkkyz 0d03c842 \"A\" (parents of rebased revision)\n\\\\\\\\\\\\\\        to: kllnlplk 2f0b0c56 \"B\" (rebase destination)\n-apples\n+bananas\n+++++++ rxvrvxyv 3f38b553 \"C\" (rebased revision)\ncherries\n>>>>>>> conflict 1 of 1 ends\n",
           "stderr": ""
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  nruzrxnw learn@example.com 2026-07-12 22:57:17 680f5d21 (conflict)\n│  C\n○  sylxlmks learn@example.com 2026-07-12 22:57:17 33dbd6d4\n│  B\n○  rmoukmky learn@example.com 2026-07-12 22:57:17 226abbc5\n│  A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  rxvrvxyv learn@example.com 2026-07-12 23:14:15 835bc062 (conflict)\n│  C\n○  kllnlplk learn@example.com 2026-07-12 23:14:15 2f0b0c56\n│  B\n○  tkzmkkyz learn@example.com 2026-07-12 23:14:15 0d03c842\n│  A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         },
         {
@@ -495,13 +495,13 @@
         {
           "cmd": "jj st",
           "exit": 0,
-          "stdout": "Working copy changes:\nM fruit.txt\nWorking copy  (@) : nruzrxnw cd5962b9 C\nParent commit (@-): sylxlmks 33dbd6d4 B\n",
+          "stdout": "Working copy changes:\nM fruit.txt\nWorking copy  (@) : rxvrvxyv 3b9e7cc6 C\nParent commit (@-): kllnlplk 2f0b0c56 B\n",
           "stderr": ""
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  nruzrxnw learn@example.com 2026-07-12 22:57:17 cd5962b9\n│  C\n○  sylxlmks learn@example.com 2026-07-12 22:57:17 33dbd6d4\n│  B\n○  rmoukmky learn@example.com 2026-07-12 22:57:17 226abbc5\n│  A\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  rxvrvxyv learn@example.com 2026-07-12 23:14:15 3b9e7cc6\n│  C\n○  kllnlplk learn@example.com 2026-07-12 23:14:15 2f0b0c56\n│  B\n○  tkzmkkyz learn@example.com 2026-07-12 23:14:15 0d03c842\n│  A\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -536,7 +536,7 @@
         {
           "cmd": "jj st",
           "exit": 0,
-          "stdout": "Working copy changes:\nA .gitignore\nWorking copy  (@) : wyuyykzt 8eb783b9 (no description set)\nParent commit (@-): zzzzzzzz 00000000 (empty) (no description set)\n",
+          "stdout": "Working copy changes:\nA .gitignore\nWorking copy  (@) : sqpywptm e016ffa5 (no description set)\nParent commit (@-): zzzzzzzz 00000000 (empty) (no description set)\n",
           "stderr": ""
         }
       ]
@@ -579,25 +579,25 @@
         {
           "cmd": "jj st",
           "exit": 0,
-          "stdout": "Working copy changes:\nM api.js\nM ui.js\nWorking copy  (@) : znrzpkzz b7c97ee2 (no description set)\nParent commit (@-): wlqkqlny c3885181 B: wire ui\n",
+          "stdout": "Working copy changes:\nM api.js\nM ui.js\nWorking copy  (@) : zownquqn 5e0d529c (no description set)\nParent commit (@-): qvputpup 825e767d B: wire ui\n",
           "stderr": ""
         },
         {
           "cmd": "jj absorb",
           "exit": 0,
           "stdout": "",
-          "stderr": "Absorbed changes into 2 revisions:\n  wlqkqlny 53c79f75 B: wire ui\n  lmopyuuz 01f68763 A: api endpoint\nWorking copy  (@) now at: wppvxmnv c0eedaa9 (empty) (no description set)\nParent commit (@-)      : wlqkqlny 53c79f75 B: wire ui\n"
+          "stderr": "Absorbed changes into 2 revisions:\n  qvputpup dc2bea7c B: wire ui\n  wkwnyury b63efa5d A: api endpoint\nWorking copy  (@) now at: wwsnpnmn 5ee4a499 (empty) (no description set)\nParent commit (@-)      : qvputpup dc2bea7c B: wire ui\n"
         },
         {
           "cmd": "jj st",
           "exit": 0,
-          "stdout": "The working copy has no changes.\nWorking copy  (@) : wppvxmnv c0eedaa9 (empty) (no description set)\nParent commit (@-): wlqkqlny 53c79f75 B: wire ui\n",
+          "stdout": "The working copy has no changes.\nWorking copy  (@) : wwsnpnmn 5ee4a499 (empty) (no description set)\nParent commit (@-): qvputpup dc2bea7c B: wire ui\n",
           "stderr": ""
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  wppvxmnv learn@example.com 2026-07-12 22:57:18 c0eedaa9\n│  (empty) (no description set)\n○  wlqkqlny learn@example.com 2026-07-12 22:57:18 53c79f75\n│  B: wire ui\n○  lmopyuuz learn@example.com 2026-07-12 22:57:18 01f68763\n│  A: api endpoint\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  wwsnpnmn learn@example.com 2026-07-12 23:14:16 5ee4a499\n│  (empty) (no description set)\n○  qvputpup learn@example.com 2026-07-12 23:14:16 dc2bea7c\n│  B: wire ui\n○  wkwnyury learn@example.com 2026-07-12 23:14:16 b63efa5d\n│  A: api endpoint\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         }
       ]
@@ -625,18 +625,18 @@
           "cmd": "jj split f1.txt",
           "exit": 0,
           "stdout": "",
-          "stderr": "Selected changes : nrrqyxqs cdbf1a28 both changes\nRemaining changes: mnrpxvwn 5e6b4670 both changes\nWorking copy  (@) now at: mnrpxvwn 5e6b4670 both changes\nParent commit (@-)      : nrrqyxqs cdbf1a28 both changes\n"
+          "stderr": "Selected changes : qovsyuwr f9de8bee both changes\nRemaining changes: zvyyknoq 5a15f24b both changes\nWorking copy  (@) now at: zvyyknoq 5a15f24b both changes\nParent commit (@-)      : qovsyuwr f9de8bee both changes\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  mnrpxvwn learn@example.com 2026-07-12 22:57:18 5e6b4670\n│  both changes\n○  nrrqyxqs learn@example.com 2026-07-12 22:57:18 cdbf1a28\n│  both changes\n◆  zzzzzzzz root() 00000000\n",
+          "stdout": "@  zvyyknoq learn@example.com 2026-07-12 23:14:16 5a15f24b\n│  both changes\n○  qovsyuwr learn@example.com 2026-07-12 23:14:16 f9de8bee\n│  both changes\n◆  zzzzzzzz root() 00000000\n",
           "stderr": ""
         },
         {
           "cmd": "jj st",
           "exit": 0,
-          "stdout": "Working copy changes:\nA f2.txt\nWorking copy  (@) : mnrpxvwn 5e6b4670 both changes\nParent commit (@-): nrrqyxqs cdbf1a28 both changes\n",
+          "stdout": "Working copy changes:\nA f2.txt\nWorking copy  (@) : zvyyknoq 5a15f24b both changes\nParent commit (@-): qovsyuwr f9de8bee both changes\n",
           "stderr": ""
         }
       ]
@@ -666,7 +666,7 @@
           "cmd": "jj git push --bookmark main",
           "exit": 0,
           "stdout": "",
-          "stderr": "Changes to push to origin:\n  bookmark: main [add to 369cf457d4fe]\n"
+          "stderr": "Changes to push to origin:\n  bookmark: main [add to e0d1795ffcac]\n"
         },
         {
           "cmd": "jj git push --bookmark main",
@@ -678,24 +678,24 @@
           "cmd": "jj describe -r subject(\"A\") -m \"rewrite attempt\"",
           "exit": 1,
           "stdout": "",
-          "stderr": "Error: Commit 02b85eaf9101 is immutable\nHint: Could not modify commit: omlptnxx 02b85eaf (empty) A\nHint: Immutable commits are used to protect shared history.\nHint: For more information, see:\n      - https://docs.jj-vcs.dev/latest/config/#set-of-immutable-commits\n      - `jj help -k config`, \"Set of immutable commits\"\nHint: This operation would rewrite 2 immutable commits.\n"
+          "stderr": "Error: Commit 27e33e008a7c is immutable\nHint: Could not modify commit: ontowrkt 27e33e00 (empty) A\nHint: Immutable commits are used to protect shared history.\nHint: For more information, see:\n      - https://docs.jj-vcs.dev/latest/config/#set-of-immutable-commits\n      - `jj help -k config`, \"Set of immutable commits\"\nHint: This operation would rewrite 2 immutable commits.\n"
         },
         {
           "cmd": "jj bookmark create feat",
           "exit": 0,
           "stdout": "",
-          "stderr": "Warning: Target revision is empty.\nCreated 1 bookmarks pointing to kossznsu 31209182 feat | (empty) (no description set)\n"
+          "stderr": "Warning: Target revision is empty.\nCreated 1 bookmarks pointing to nmywmpnq 7f98a0eb feat | (empty) (no description set)\n"
         },
         {
           "cmd": "jj git push --bookmark feat",
           "exit": 1,
           "stdout": "",
-          "stderr": "Error: Won't push commit 31209182c8b8 since it has no description\nHint: Rejected commit: kossznsu 31209182 feat | (empty) (no description set)\n"
+          "stderr": "Error: Won't push commit 7f98a0ebf576 since it has no description\nHint: Rejected commit: nmywmpnq 7f98a0eb feat | (empty) (no description set)\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  kossznsu learn@example.com 2026-07-12 22:57:18 feat 31209182\n│  (empty) (no description set)\n◆  yqnpssll learn@example.com 2026-07-12 22:57:18 main 369cf457\n│  (empty) B\n~\n",
+          "stdout": "@  nmywmpnq learn@example.com 2026-07-12 23:14:16 feat 7f98a0eb\n│  (empty) (no description set)\n◆  koqwrqyv learn@example.com 2026-07-12 23:14:16 main e0d1795f\n│  (empty) B\n~\n",
           "stderr": ""
         }
       ]
@@ -731,25 +731,181 @@
           "cmd": "jj describe -m \"F1 v2\"",
           "exit": 0,
           "stdout": "",
-          "stderr": "Working copy  (@) now at: pzkmyxny bc990f2c feat* | (empty) F1 v2\nParent commit (@-)      : uowoltso af03e29e main | (empty) A\n"
+          "stderr": "Working copy  (@) now at: yknqqqzl 380c77da feat* | (empty) F1 v2\nParent commit (@-)      : vqpzlsqv 63935b22 main | (empty) A\n"
         },
         {
           "cmd": "jj git push",
           "exit": 0,
           "stdout": "",
-          "stderr": "Changes to push to origin:\n  bookmark: feat [move sideways from 0f3d9137df5c to bc990f2c2af1]\n"
+          "stderr": "Changes to push to origin:\n  bookmark: feat [move sideways from e9161828060c to 380c77da421d]\n"
         },
         {
           "cmd": "jj bookmark set main -r @",
           "exit": 0,
           "stdout": "",
-          "stderr": "Moved 1 bookmarks to pzkmyxny bc990f2c feat main* | (empty) F1 v2\n"
+          "stderr": "Moved 1 bookmarks to yknqqqzl 380c77da feat main* | (empty) F1 v2\n"
         },
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  pzkmyxny learn@example.com 2026-07-12 22:57:20 feat main* bc990f2c\n│  (empty) F1 v2\n◆  uowoltso learn@example.com 2026-07-12 22:57:19 main@origin af03e29e\n│  (empty) A\n~\n",
+          "stdout": "@  yknqqqzl learn@example.com 2026-07-12 23:14:17 feat main* 380c77da\n│  (empty) F1 v2\n◆  vqpzlsqv learn@example.com 2026-07-12 23:14:17 main@origin 63935b22\n│  (empty) A\n~\n",
           "stderr": ""
+        }
+      ]
+    },
+    {
+      "name": "bookmark-conflict",
+      "steps": [
+        {
+          "cmd": "jj commit -m \"A: base\"",
+          "hidden": true
+        },
+        {
+          "cmd": "jj bookmark create main -r @-",
+          "hidden": true
+        },
+        {
+          "cmd": "jj git push --bookmark main",
+          "hidden": true
+        },
+        {
+          "cmd": "sh: git clone -q origin.git colleague",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "cmd": "jj new main -m \"local: adjust config\"",
+          "hidden": true
+        },
+        {
+          "cmd": "jj bookmark set main -r @",
+          "hidden": true
+        },
+        {
+          "cmd": "sh: echo fix > hotfix.txt && git add -A && git commit -qm \"teammate: hotfix\" && git push -q",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "cmd": "jj git fetch",
+          "exit": 0,
+          "stdout": "",
+          "stderr": "bookmark: main@origin [updated] tracked\n"
+        },
+        {
+          "cmd": "jj bookmark list",
+          "exit": 0,
+          "stdout": "main (conflicted):\n  - wvtzuqwx f31fd5d3 (empty) A: base\n  + vmpkytul 3208042b (empty) local: adjust config\n  + swvprmnr f2a7aac6 teammate: hotfix\n  @git (behind by 1 commits): vmpkytul 3208042b (empty) local: adjust config\n  @origin (behind by 1 commits): swvprmnr f2a7aac6 teammate: hotfix\n",
+          "stderr": "Hint: Some bookmarks have conflicts. Use `jj bookmark set <name> -r <rev>` to resolve.\n"
+        },
+        {
+          "cmd": "jj log",
+          "exit": 0,
+          "stdout": "@  vmpkytul learn@example.com 2026-07-12 23:14:17 main?? main@git 3208042b\n│  (empty) local: adjust config\n│ ◆  swvprmnr col@example.com 2026-07-12 23:14:18 main?? main@origin f2a7aac6\n├─╯  teammate: hotfix\n◆  wvtzuqwx learn@example.com 2026-07-12 23:14:17 f31fd5d3\n│  (empty) A: base\n~\n",
+          "stderr": ""
+        },
+        {
+          "cmd": "jj git push",
+          "exit": 0,
+          "stdout": "",
+          "stderr": "Warning: Bookmark main is conflicted\nHint: Run `jj bookmark list` to inspect, and use `jj bookmark set` to fix it up.\nNothing changed.\n"
+        },
+        {
+          "cmd": "jj bookmark set main -r @",
+          "exit": 0,
+          "stdout": "",
+          "stderr": "Moved 1 bookmarks to vmpkytul 3208042b main* | (empty) local: adjust config\n"
+        },
+        {
+          "cmd": "jj bookmark list",
+          "exit": 0,
+          "stdout": "main: vmpkytul 3208042b (empty) local: adjust config\n  @origin (ahead by 1 commits, behind by 1 commits): swvprmnr f2a7aac6 teammate: hotfix\n",
+          "stderr": ""
+        },
+        {
+          "cmd": "jj git push",
+          "exit": 0,
+          "stdout": "",
+          "stderr": "Changes to push to origin:\n  bookmark: main [move sideways from f2a7aac611dd to 3208042bcfa1]\n"
+        }
+      ]
+    },
+    {
+      "name": "divergent-change",
+      "steps": [
+        {
+          "cmd": "jj describe -m \"fix: retry logic\"",
+          "hidden": true
+        },
+        {
+          "cmd": "sh: echo v1 > retry.js",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "cmd": "jj bookmark create feat",
+          "hidden": true
+        },
+        {
+          "cmd": "jj git push --bookmark feat",
+          "hidden": true
+        },
+        {
+          "cmd": "sh: git clone -q origin.git colleague",
+          "exit": 0,
+          "stdout": "",
+          "stderr": "warning: remote HEAD refers to nonexistent ref, unable to checkout\n"
+        },
+        {
+          "cmd": "sh: echo v2 > retry.js",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "cmd": "sh: git checkout -q feat && echo maintainer > retry.js && git add -A && git commit -q --amend --no-edit && git push -qf origin feat",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "cmd": "jj git fetch",
+          "exit": 0,
+          "stdout": "",
+          "stderr": "bookmark: feat@origin [updated] tracked\n"
+        },
+        {
+          "cmd": "jj log",
+          "exit": 0,
+          "stdout": "@  vvluuqkm/1 learn@example.com 2026-07-12 23:14:19 feat?? feat@git ca228fe6 (divergent)\n│  fix: retry logic\n│ ○  vvluuqkm/0 learn@example.com 2026-07-12 23:14:18 feat?? feat@origin 97c5fbb9 (divergent)\n├─╯  fix: retry logic\n◆  zzzzzzzz root() 00000000\n",
+          "stderr": ""
+        },
+        {
+          "cmd": "jj bookmark list",
+          "exit": 0,
+          "stdout": "feat (conflicted):\n  - vvluuqkm/2 1274fcc4 (hidden) fix: retry logic\n  + vvluuqkm/1 ca228fe6 (divergent) fix: retry logic\n  + vvluuqkm/0 97c5fbb9 (divergent) fix: retry logic\n  @git (behind by 1 commits): vvluuqkm/1 ca228fe6 (divergent) fix: retry logic\n  @origin (behind by 1 commits): vvluuqkm/0 97c5fbb9 (divergent) fix: retry logic\n",
+          "stderr": "Hint: Some bookmarks have conflicts. Use `jj bookmark set <name> -r <rev>` to resolve.\n"
+        },
+        {
+          "cmd": "jj abandon @",
+          "exit": 0,
+          "stdout": "",
+          "stderr": "Abandoned 1 commits:\n  vvluuqkm/1 ca228fe6 feat?? feat@git | (divergent) fix: retry logic\nWorking copy  (@) now at: omkustqz eab343d8 (empty) (no description set)\nParent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)\nAdded 0 files, modified 0 files, removed 1 files\n"
+        },
+        {
+          "cmd": "jj log",
+          "exit": 0,
+          "stdout": "@  omkustqz learn@example.com 2026-07-12 23:14:19 eab343d8\n│  (empty) (no description set)\n│ ○  vvluuqkm learn@example.com 2026-07-12 23:14:18 feat?? feat@origin 97c5fbb9\n├─╯  fix: retry logic\n◆  zzzzzzzz root() 00000000\n",
+          "stderr": ""
+        },
+        {
+          "cmd": "jj bookmark list",
+          "exit": 0,
+          "stdout": "feat (conflicted):\n  - vvluuqkm/2 1274fcc4 (hidden) fix: retry logic\n  + vvluuqkm 97c5fbb9 fix: retry logic\n  @git (ahead by 1 commits, behind by 1 commits): vvluuqkm/1 ca228fe6 (hidden) fix: retry logic\n  @origin: vvluuqkm 97c5fbb9 fix: retry logic\n",
+          "stderr": "Hint: Some bookmarks have conflicts. Use `jj bookmark set <name> -r <rev>` to resolve.\n"
         }
       ]
     },
@@ -789,7 +945,7 @@
         {
           "cmd": "jj log",
           "exit": 0,
-          "stdout": "@  wzmmsmtw learn@example.com 2026-07-12 22:57:20 ade0bb53\n│  (empty) (no description set)\n│ ◆  xsspokyr col@example.com 2026-07-12 22:57:20 main 9ae8e426\n├─╯  teammate: hotfix\n◆  qmlmlvtr learn@example.com 2026-07-12 22:57:20 bf5c1301\n│  (empty) A\n~\n",
+          "stdout": "@  zvsvuqop learn@example.com 2026-07-12 23:14:19 6f1a80c2\n│  (empty) (no description set)\n│ ◆  vlskzkwu col@example.com 2026-07-12 23:14:19 main 60e0ca22\n├─╯  teammate: hotfix\n◆  suzqnqsm learn@example.com 2026-07-12 23:14:19 e1c7d15a\n│  (empty) A\n~\n",
           "stderr": ""
         },
         {
