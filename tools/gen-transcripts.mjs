@@ -175,6 +175,28 @@ const SCENARIOS = [
     ],
   },
   {
+    name: 'absorb',
+    steps: [
+      'sh: echo a1 > api.js', '#jj commit -m "A: api endpoint"',
+      'sh: echo u1 > ui.js', '#jj commit -m "B: wire ui"',
+      'sh: echo a2 > api.js', 'sh: echo u2 > ui.js',
+      'jj st',
+      'jj absorb',
+      'jj st',
+      'jj log',
+    ],
+  },
+  {
+    name: 'split',
+    steps: [
+      'sh: echo x > f1.txt', 'sh: echo y > f2.txt',
+      '#jj describe -m "both changes"',
+      'jj split f1.txt',
+      'jj log',
+      'jj st',
+    ],
+  },
+  {
     name: 'remote-push',
     setupOrigin: true,
     steps: [

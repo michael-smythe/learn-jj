@@ -18,6 +18,9 @@ const SEQUENCES = [
   { id: 'remotes', title: 'GitHub & GitLab', blurb: 'Bookmarks become branches: push, fetch, and the PR loop without force-push fear.' },
   { id: 'conflicts', title: 'Conflicts Without Fear', blurb: 'Conflicts are recorded in commits, not emergencies that block you.' },
   { id: 'oops', title: 'Oops: Secrets & History Surgery', blurb: 'Committed something you shouldn\'t have? Fix it at every stage.' },
+  { id: 'surgery2', title: 'History Surgery II', blurb: 'absorb, split, and cherry-picking with duplicate — the amend toolkit.' },
+  { id: 'fieldguide', title: 'The jj \u2a2f git Field Guide', blurb: 'Colocated repos, what undo can\'t do, and how not to scare git.' },
+  { id: 'grad', title: 'Graduation', blurb: 'One real day of work, start to finish.' },
 ];
 
 const LEVELS = [
@@ -502,6 +505,159 @@ const LEVELS = [
       'jj bookmark create main -r @-', 'jj git push -b main',
     ],
     solution: ['jj revert -r kl -d main', 'jj bookmark set main -r kn', 'jj git push'],
+  },
+
+  /* ---------------------------------------------- surgery2 ---- */
+  {
+    id: 'surgery2-1', seq: 'surgery2', title: 'absorb: the magic amend',
+    cards: [
+      `<p>You're two commits into a feature and, while testing, you fix a typo in
+       <code>api.js</code> (from commit A) and tweak <code>ui.js</code> (from commit B).
+       Both fixes are sitting in <code>@</code>, but they <em>belong</em> in their commits.</p>
+       <p>The git ritual: two <code>commit --fixup</code>s, then
+       <code>rebase -i --autosquash</code>. The jj ritual:</p>
+       <p><code>jj absorb</code></p>
+       <p>Each change is folded into the nearest mutable ancestor that touched the same
+       code — real jj decides hunk-by-hunk using blame; this playground works per file.
+       Anything unmatched simply stays in <code>@</code>.</p>`,
+    ],
+    objective: 'Both fixes in @ belong upstream. Absorb them into A and B in one move.',
+    hint: 'jj absorb — then read which revisions it absorbed into.',
+    start: [
+      'echo a1 > api.js', 'jj commit -m "A: api endpoint"',
+      'echo u1 > ui.js', 'jj commit -m "B: wire ui"',
+      'echo a2 > api.js', 'echo u2 > ui.js',
+    ],
+    solution: ['jj absorb'],
+  },
+  {
+    id: 'surgery2-2', seq: 'surgery2', title: 'split: one commit, two ideas',
+    cards: [
+      `<p>The opposite problem: one commit contains two unrelated changes — a database
+       migration and an API handler. Reviewers hate it. Time to split.</p>
+       <p><code>jj split &lt;file…&gt;</code> — the named paths go into a <em>first</em> commit,
+       the remainder stays in the second. (Real jj opens an interactive diff editor to pick
+       hunks; here you select whole files.)</p>
+       <p>Both halves inherit the old description, so finish the job by renaming each —
+       remember <code>jj describe -r @-</code> reaches the parent.</p>`,
+    ],
+    objective: 'Split db.sql out of the combined commit, then describe the halves "db: add migration" and "api: add handler".',
+    hint: 'jj split db.sql · jj describe -r @- -m "db: add migration" · jj describe -m "api: add handler"',
+    start: ['echo migration > db.sql', 'echo handler > api.js', 'jj describe -m "everything at once"'],
+    solution: ['jj split db.sql', 'jj describe -r @- -m "db: add migration"', 'jj describe -m "api: add handler"'],
+  },
+  {
+    id: 'surgery2-3', seq: 'surgery2', title: 'Backport (a.k.a. cherry-pick)',
+    cards: [
+      `<p>Classic release management: <code>main</code> has moved on (and is pushed —
+       immutable ◆), but customers on <code>release-1.0</code> need the overflow fix
+       <em>without</em> the new engine feature.</p>
+       <p>git says <code>cherry-pick</code>. jj says: <strong>copy, then move the copy</strong>:</p>
+       <p><code>jj duplicate &lt;fix&gt;</code> — a mutable copy of an immutable commit
+       (copying isn't rewriting!)<br>
+       <code>jj rebase -r &lt;copy&gt; -d release-1.0</code> — carry it over<br>
+       <code>jj bookmark set release-1.0 -r &lt;copy&gt;</code> · <code>jj git push</code></p>`,
+    ],
+    objective: 'Backport "fix: overflow" onto release-1.0 and push. (The original stays on main.)',
+    hint: 'jj duplicate km · jj rebase -r ko -d release-1.0 · jj bookmark set release-1.0 -r ko · jj git push',
+    start: [
+      'echo v1 > core.js', 'jj commit -m "1.0: core"',
+      'jj bookmark create release-1.0 -r @-', 'jj git push -b release-1.0',
+      'echo v2 > core.js', 'jj commit -m "feat: new engine"',
+      'echo fix > overflow.js', 'jj commit -m "fix: overflow"',
+      'jj bookmark create main -r @-', 'jj git push -b main',
+    ],
+    solution: ['jj duplicate km', 'jj rebase -r ko -d release-1.0', 'jj bookmark set release-1.0 -r ko', 'jj git push'],
+  },
+
+  /* --------------------------------------------- fieldguide ---- */
+  {
+    id: 'fieldguide-1', seq: 'fieldguide', title: 'undo cannot un-push',
+    cards: [
+      `<p>You pushed your feature branch… including <code>debug.log</code>. Reflex says
+       <code>jj undo</code> — and look, the <code>feat@origin</code> chip disappears!
+       Crisis averted?</p>
+       <p><strong>No.</strong> The operation log is <em>local</em>. Undo rewound your repo's
+       <em>view</em> of origin — the server still has everything you pushed. Run
+       <code>jj git fetch</code> and watch the chip come right back.</p>
+       <p>The real fix is the one you already know: repair the branch (it's yours and
+       mutable — <code>rm debug.log</code>) and push the rewrite. And if a <em>secret</em>
+       ever reaches origin, no local command un-leaks it: rotate it.</p>`,
+    ],
+    objective: 'Try the undo (it will not stick) — then actually clean debug.log off feat and push the fix.',
+    hint: 'jj undo · jj git fetch (surprise!) · rm debug.log · jj git push',
+    start: [
+      'jj commit -m "A: base"', 'jj bookmark create main -r @-', 'jj git push -b main',
+      'jj describe -m "F: metrics dashboard"', 'echo charts > metrics.js', 'echo verbose > debug.log',
+      'jj bookmark create feat', 'jj git push -b feat',
+    ],
+    solution: ['jj undo', 'jj git fetch', 'rm debug.log', 'jj git push'],
+  },
+  {
+    id: 'fieldguide-2', seq: 'fieldguide', title: 'Living with git (colocation)',
+    cards: [
+      `<p>Real adoption path: <code>jj git init --colocate</code> in an existing git repo.
+       Both tools share one directory — git tooling, IDEs, and CI keep working while you
+       drive with jj.</p>
+       <p>Two sights that alarm git users, both <em>normal</em>:</p>
+       <p>1. <code>git status</code> says <strong>"HEAD detached"</strong> — jj parks git's
+       HEAD at <code>@-</code> on purpose. You are not lost.<br>
+       2. Your <code>@</code> commit shows as <strong>uncommitted changes</strong> to git —
+       git can't see that jj already snapshotted them.</p>
+       <p>Try it: run <code>git status</code>, <code>git log</code>, <code>git branch</code>
+       here — read-only git is always safe.</p>`,
+      `<p>The one rule of colocation: <strong>don't rewrite history with git</strong>.
+       <code>git rebase</code> / <code>reset</code> / <code>commit --amend</code> race
+       against jj's ref import and can create divergent changes. (Try
+       <code>git rebase</code> here — the playground shows the jj translation for every
+       mutating git command.)</p>
+       <p>Your task, the jj way instead of <code>git checkout -b feature</code>: describe
+       the work in <code>@</code> and put a bookmark on it. That's a "branch".</p>`,
+    ],
+    objective: 'Peek with git status, then: describe @ as "F: feature" and create bookmark "feature" on it.',
+    hint: 'git status (look around!) · jj describe -m "F: feature" · jj bookmark create feature',
+    start: [
+      'jj commit -m "A: initial"', 'jj bookmark create main -r @-', 'jj git push -b main',
+      'echo wip > feature.js',
+    ],
+    solution: ['jj describe -m "F: feature"', 'jj bookmark create feature'],
+  },
+
+  /* --------------------------------------------------- grad ---- */
+  {
+    id: 'grad-1', seq: 'grad', title: 'A day in the life',
+    cards: [
+      `<p>Graduation. Your two-commit feature stack (<code>C1</code> api, <code>C2</code> ui)
+       is up as a PR on <code>feat</code>. Overnight, a teammate landed an api hotfix on
+       <code>main</code>. Your morning:</p>
+       <p>1. <code>jj git fetch</code> — pull the news.<br>
+       2. <code>jj rebase -b @ -d main</code> — stack onto the new trunk. It will conflict
+       (you both touched <code>api.js</code>) — remember: the rebase <em>finishes</em>, the
+       × just waits.<br>
+       3. Fix it at the source: <code>jj edit kl</code> · <code>echo v2 &gt; api.js</code> —
+       C2 heals itself. Head back: <code>jj edit km</code>.</p>`,
+      `<p>4. Review feedback arrives: polish the ui. Do it the lazy-genius way — fresh
+       change on top, then let absorb file it:<br>
+       <code>jj new</code> · <code>echo polish &gt; ui.js</code> · <code>jj absorb</code></p>
+       <p>5. <code>jj git push</code> — the rewritten stack updates the PR
+       (force-with-lease semantics, no flags, no fear).</p>
+       <p>Everything here is a move you've already made. Go.</p>`,
+    ],
+    objective: 'Fetch, rebase onto main, resolve api.js to "v2", absorb a ui polish ("polish") into C2, and push feat.',
+    hint: 'jj git fetch · jj rebase -b @ -d main · jj edit kl · echo v2 > api.js · jj edit km · jj new · echo polish > ui.js · jj absorb · jj git push',
+    start: [
+      'jj commit -m "A: base"', 'jj bookmark create main -r @-', 'jj git push -b main',
+      'jj describe -m "C1: api endpoint"', 'echo v1 > api.js',
+      'jj new -m "C2: ui button"', 'echo v1 > ui.js',
+      'jj bookmark create feat', 'jj git push -b feat',
+    ],
+    remote: [[{ on: 'main', desc: 'teammate: api hotfix', files: { 'api.js': 'hotfix' } }]],
+    solution: [
+      'jj git fetch', 'jj rebase -b @ -d main',
+      'jj edit kl', 'echo v2 > api.js', 'jj edit km',
+      'jj new', 'echo polish > ui.js', 'jj absorb',
+      'jj git push',
+    ],
   },
 ];
 

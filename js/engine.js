@@ -72,6 +72,8 @@ const USAGE = {
   revert: 'jj revert [OPTIONS]',
   op: 'jj operation <COMMAND>',
   resolve: 'jj resolve [OPTIONS] [FILESETS]...',
+  absorb: 'jj absorb [OPTIONS] [FILESETS]...',
+  split: 'jj split [OPTIONS] [FILESETS]...',
 };
 
 /* Real jj subcommands we don't simulate — acknowledged, never "unknown". */
@@ -79,9 +81,7 @@ const STUB_COMMANDS = {
   config: 'Configuration is fixed here; real jj: jj config list / jj config set.',
   diff: 'Try jj st to see @’s changes, or cat <file> to read one.',
   show: 'Try jj st, cat <file>, or read the graph — it is the show view here.',
-  split: 'Not simulated yet — squash/new cover most teaching cases.',
   restore: 'Not simulated yet — rewrite the file with echo, or jj undo.',
-  absorb: 'Not simulated yet — use jj squash -r to fold work into an ancestor.',
   evolog: 'Not simulated — jj op log shows this playground’s history.',
   next: 'Not simulated yet — use jj edit <child-id> to move @ forward.',
   prev: 'Not simulated yet — use jj edit @- to move @ back.',
@@ -200,7 +200,8 @@ class JJEngine {
     this.counter = 0;
     this.changes = new Map();
     this.bookmarks = new Map();
-    this.remote = new Map();      // name -> {id, commitId} (state of name@origin)
+    this.remote = new Map();      // name -> {id, commitId} — jj's *view* of origin
+    this.server = new Map();      // the actual remote host; op log (undo) can't touch it
     this.remoteScript = [];       // scripted colleague activity, revealed by jj git fetch
     this.fetchCount = 0;
     this.ops = [];
@@ -557,7 +558,10 @@ class JJEngine {
 
     const shell = { echo: '_shEcho', cat: '_shCat', rm: '_shRm', ls: '_shLs' };
     let method, args;
-    if (tokens[0] !== 'jj') {
+    if (tokens[0] === 'git') {
+      method = '_cmdNativeGit';
+      args = tokens.slice(1);
+    } else if (tokens[0] !== 'jj') {
       method = shell[tokens[0]];
       args = tokens.slice(1);
       if (!method) return { ok: false, lines: [{ t: `Unknown command "${tokens[0]}"`, c: 'err' }] };
@@ -572,6 +576,7 @@ class JJEngine {
         op: '_cmdOp', operation: '_cmdOp', log: '_cmdLog', status: '_cmdStatus', st: '_cmdStatus',
         git: '_cmdGit', revert: '_cmdRevert', backout: '_cmdRevert',
         file: '_cmdFile', resolve: '_cmdResolve',
+        absorb: '_cmdAbsorb', split: '_cmdSplit',
       };
       if (!sub) {
         return { ok: true, lines: [{ t: 'jj — a version control system (playground). Type "help" for commands.', c: 'dim' }] };
@@ -1006,7 +1011,7 @@ class JJEngine {
   _cmdDuplicate(args) {
     const { pos } = parseArgs(args, {});
     const rev = pos.length ? this.resolve(pos[0]) : this.wc;
-    this._checkRewritable(rev);
+    if (rev === ROOT_ID) throw new JJError('Cannot duplicate the root commit');
     const rc = this.get(rev);
     const node = this._createChange(rc.parents, rc.desc, rc.files);
     return {
@@ -1177,7 +1182,7 @@ class JJEngine {
       const target = this.bookmarks.get(name);
       const cur = this.remote.get(name);
       if (cur && cur.id === target && cur.commitId === this.get(target).commitId) {
-        warnings.push({ t: `Bookmark ${name}@origin already matches ${name}`, c: 'dim' });
+        if (flags.b) warnings.push({ t: `Bookmark ${name}@origin already matches ${name}`, c: 'dim' });
         continue;
       }
       // Validate the commits that would land on origin.
@@ -1213,6 +1218,7 @@ class JJEngine {
       }
       lines.push({ t: `  bookmark: ${name} [${what}]`, c: '' });
       this.remote.set(name, { id: target, commitId: newCid });
+      this.server.set(name, { id: target, commitId: newCid });
     }
     const trunk = this._trunkName();
     if (trunk && changed.includes(trunk)) {
@@ -1222,34 +1228,209 @@ class JJEngine {
   }
 
   _gitFetch() {
-    if (this.fetchCount >= this.remoteScript.length) {
-      return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
-    }
-    const batch = this.remoteScript[this.fetchCount];
-    this.fetchCount++;
     const lines = [];
-    for (const ev of batch) {
-      const cur = this.remote.get(ev.on);
-      const parentId = cur ? cur.id : this.bookmarks.get(ev.on);
-      if (!parentId) throw new JJError(`Remote has no branch "${ev.on}" to update`);
-      const trees = this.computeTrees();
-      const ptree = trees.get(parentId) || {};
-      const files = {};
-      for (const [f, v] of Object.entries(ev.files || {})) {
-        let from = ptree[f] ?? null;
-        if (isConflict(from)) from = from.conflict.base;
-        files[f] = { from, to: v };
-      }
-      const node = this._createChange([parentId], ev.desc, files);
-      const oldRemoteId = cur ? cur.id : null;
-      this.remote.set(ev.on, { id: node.id, commitId: node.commitId });
-      lines.push({ t: `bookmark: ${ev.on}@origin [updated] tracked`, c: 'ok' });
-      if (this.bookmarks.get(ev.on) === oldRemoteId || this.bookmarks.get(ev.on) === parentId) {
-        this.bookmarks.set(ev.on, node.id);
-        lines.push({ t: `(local bookmark ${ev.on} tracked the update and moved along)`, c: 'dim' });
+    // 1. Scripted teammate activity lands on the *server*.
+    if (this.fetchCount < this.remoteScript.length) {
+      const batch = this.remoteScript[this.fetchCount];
+      this.fetchCount++;
+      for (const ev of batch) {
+        const cur = this.server.get(ev.on) || this.remote.get(ev.on);
+        const parentId = cur ? cur.id : this.bookmarks.get(ev.on);
+        if (!parentId || !this.changes.has(parentId)) throw new JJError(`Remote has no branch "${ev.on}" to update`);
+        const trees = this.computeTrees();
+        const ptree = trees.get(parentId) || {};
+        const files = {};
+        for (const [f, v] of Object.entries(ev.files || {})) {
+          let from = ptree[f] ?? null;
+          if (isConflict(from)) from = from.conflict.base;
+          files[f] = { from, to: v };
+        }
+        const node = this._createChange([parentId], ev.desc, files);
+        this.server.set(ev.on, {
+          id: node.id, commitId: node.commitId,
+          respawn: { desc: ev.desc, files: JSON.parse(JSON.stringify(files)), parentId },
+        });
       }
     }
+    // 2. Sync jj's view of origin from the server. This is why `jj undo`
+    //    cannot un-push: undo rewinds the view, the server doesn't care.
+    for (const [name, ref] of this.server) {
+      const view = this.remote.get(name);
+      if (view && view.id === ref.id && view.commitId === ref.commitId) continue;
+      if (!this.changes.has(ref.id) && ref.respawn && this.changes.has(ref.respawn.parentId)) {
+        this.changes.set(ref.id, {
+          id: ref.id, commitId: ref.commitId, desc: ref.respawn.desc,
+          parents: [ref.respawn.parentId], immutable: false,
+          files: JSON.parse(JSON.stringify(ref.respawn.files)),
+        });
+      }
+      if (!this.changes.has(ref.id)) continue;
+      const prevViewId = view ? view.id : null;
+      this.remote.set(name, { id: ref.id, commitId: ref.commitId });
+      lines.push({ t: `bookmark: ${name}@origin [updated] tracked`, c: 'ok' });
+      const local = this.bookmarks.get(name);
+      if (local !== ref.id && (local === prevViewId || (ref.respawn && local === ref.respawn.parentId))) {
+        this.bookmarks.set(name, ref.id);
+        lines.push({ t: `(local bookmark ${name} tracked the update and moved along)`, c: 'dim' });
+      }
+    }
+    if (!lines.length) return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
     return { op: 'fetch from git remote(s) origin', lines };
+  }
+
+  /* jj absorb — fold each of @'s file changes into the nearest mutable
+   * ancestor that touches the same file (real jj works hunk-by-hunk via
+   * blame; file granularity is this playground's abstraction). */
+  _cmdAbsorb(args) {
+    parseArgs(args, {}, 'absorb');
+    const wcC = this.get(this.wc);
+    const entries = Object.entries(wcC.files);
+    if (!entries.length) return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
+    const immutable = this._immutableIds();
+    const order = [];
+    {
+      const seen = new Set(); const q = [...wcC.parents];
+      while (q.length) {
+        const id = q.shift();
+        if (seen.has(id)) continue;
+        seen.add(id); order.push(id);
+        const c = this.get(id);
+        if (c) q.push(...c.parents);
+      }
+    }
+    const dests = new Map();
+    const leftovers = {};
+    for (const [f, patch] of entries) {
+      const dest = order.find(id => id !== ROOT_ID && !immutable.has(id) && this.get(id).files[f]);
+      if (dest) {
+        const dc = this.get(dest);
+        dc.files[f] = { from: dc.files[f].from ?? null, to: patch.to ?? null };
+        if (!dests.has(dest)) dests.set(dest, []);
+        dests.get(dest).push(f);
+      } else leftovers[f] = patch;
+    }
+    if (!dests.size) {
+      return { op: null, lines: [
+        { t: 'Nothing changed.', c: 'dim' },
+        { t: '(no mutable ancestor touches these files — jj squash --into is the manual tool)', c: 'dim' },
+      ] };
+    }
+    wcC.files = leftovers;
+    for (const d of dests.keys()) this._touch(this.descendantsOf(d, true));
+    const lines = [{ t: `Absorbed changes into ${dests.size} revisions:`, c: 'ok' }];
+    for (const id of order) if (dests.has(id)) lines.push({ t: `  ${this._fmt(id)}`, c: '' });
+    // Real jj leaves a fresh working-copy commit when @ was fully drained.
+    if (!Object.keys(wcC.files).length && !wcC.desc &&
+        this.childrenOf(this.wc).length === 0 && this.bookmarksAt(this.wc).length === 0) {
+      const parents = wcC.parents.slice();
+      this.changes.delete(this.wc);
+      const node = this._createChange(parents, '');
+      this.wc = node.id;
+    }
+    lines.push(...this._wcLines());
+    return { op: 'absorb changes into mutable revisions', lines };
+  }
+
+  /* jj split <paths…> — selected paths become the first (parent) commit;
+   * the target keeps the remainder. Real jj opens an interactive diff
+   * editor; this playground selects whole files by path. */
+  _cmdSplit(args) {
+    const { flags, pos } = parseArgs(args, {
+      r: { value: true, aliases: ['revision'] },
+      m: { value: true, aliases: ['message'] },
+    }, 'split');
+    const rev = flags.r ? this.resolve(flags.r) : this.wc;
+    this._checkRewritable(rev);
+    const rc = this.get(rev);
+    if (!pos.length) {
+      throw new JJError('jj split needs file paths in this playground (there is no interactive diff editor)',
+        `Files changed in ${this.short(rev)}: ${Object.keys(rc.files).join(', ') || '(none)'}`);
+    }
+    const selected = {};
+    for (const p of pos) {
+      if (!rc.files[p]) throw new JJError(`'${p}' is not changed in ${this.short(rev)}`,
+        `Files changed there: ${Object.keys(rc.files).join(', ') || '(none)'}`);
+      selected[p] = rc.files[p];
+    }
+    if (Object.keys(selected).length === Object.keys(rc.files).length) {
+      throw new JJError('Refusing to split: all changes were selected, nothing would remain',
+        'Select a subset of the changed files.');
+    }
+    const first = this._createChange(rc.parents, typeof flags.m === 'string' ? flags.m : rc.desc, selected);
+    rc.parents = [first.id];
+    for (const p of pos) delete rc.files[p];
+    this._touch(this.descendantsOf(rev, true));
+    return { op: `split commit ${rc.commitId}`, lines: [
+      { t: `Selected changes : ${this._fmt(first.id)}`, c: 'ok' },
+      { t: `Remaining changes: ${this._fmt(rev)}`, c: 'ok' },
+      ...(rev === this.wc ? this._wcLines() : []),
+    ] };
+  }
+
+  /* Mock native git, as seen from a colocated repo. Read-only commands show
+   * git's honest (and initially alarming) view; mutating ones are refused
+   * with the jj translation. */
+  _cmdNativeGit(args) {
+    const sub = args[0];
+    const wcC = this.get(this.wc);
+    if (!sub || sub === 'status') {
+      const parent = wcC.parents[0];
+      const lines = [{ t: `HEAD detached at ${this.get(parent).commitId.slice(0, 8)}`, c: '' }];
+      const entries = Object.entries(wcC.files);
+      if (!entries.length) lines.push({ t: 'nothing to commit, working tree clean', c: '' });
+      else {
+        lines.push({ t: 'Changes not staged for commit:', c: '' });
+        for (const [f, p] of entries) {
+          const kind = (p.from ?? null) === null ? 'new file' : (p.to ?? null) === null ? 'deleted' : 'modified';
+          lines.push({ t: `\t${kind}:   ${f}`, c: '' });
+        }
+      }
+      lines.push({ t: '(colocated view: git parks HEAD at @-, so your @ commit shows up as uncommitted changes. Both are normal — jj has already snapshotted everything.)', c: 'dim' });
+      return { op: null, lines };
+    }
+    if (sub === 'log') {
+      const lines = [];
+      const seen = new Set(); const q = [this.wc];
+      while (q.length && lines.length < 8) {
+        const id = q.shift();
+        if (seen.has(id) || id === ROOT_ID) continue;
+        seen.add(id);
+        const c = this.get(id);
+        lines.push({ t: `${c.commitId.slice(0, 8)} ${c.desc || '(no description set)'}`, c: '' });
+        q.push(...c.parents);
+      }
+      lines.push({ t: '(git sees jj\u2019s commits directly — same objects, same hashes)', c: 'dim' });
+      return { op: null, lines };
+    }
+    if (sub === 'branch') {
+      const lines = [...this.bookmarks.keys()].sort().map(n => ({ t: `  ${n}`, c: '' }));
+      lines.push({ t: '(jj bookmarks are exported as real git branches)', c: 'dim' });
+      return { op: null, lines };
+    }
+    const JJ_WAY = {
+      commit: 'jj commit -m "…" (jj already snapshotted your files)',
+      add: 'nothing! jj tracks new files automatically',
+      checkout: 'jj new <rev> (work on top) or jj edit <rev> (amend it)',
+      switch: 'jj new <bookmark> — there is no "current branch" to switch',
+      rebase: 'jj rebase -b @ -d <dest>',
+      reset: 'jj abandon (drop a change) or jj restore (drop file edits)',
+      merge: 'jj new <rev1> <rev2> -m "…"',
+      pull: 'jj git fetch, then jj rebase -d main',
+      push: 'jj git push',
+      stash: 'jj new — your work is already safe in a commit; just start another',
+      'cherry-pick': 'jj duplicate <rev>, then jj rebase -r <copy> -d <dest>',
+      revert: 'jj revert -r <rev> -d <dest>',
+      restore: 'echo <old content> > <file>, or jj abandon @',
+    };
+    if (JJ_WAY[sub]) {
+      return { op: null, lines: [
+        { t: `(refused) In a colocated repo, mutating git commands can fight with jj — rewritten refs get re-imported and you risk divergent changes.`, c: 'err' },
+        { t: `The jj way: ${JJ_WAY[sub]}`, c: 'dim' },
+      ] };
+    }
+    return { op: null, lines: [
+      { t: `(this playground mocks read-only git: status, log, branch)`, c: 'dim' },
+    ] };
   }
 
   _cmdRevert(args) {

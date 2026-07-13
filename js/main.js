@@ -56,9 +56,12 @@ const HELP = [
   ['jj duplicate [rev]', 'copy a change'],
   ['jj undo · jj op log', 'the operation log & repo-wide undo'],
   ['jj git push [-b name|--all] · jj git fetch', 'talk to origin (GitHub/GitLab)'],
+  ['jj absorb', "auto-fold @'s file changes into the ancestors that touched them"],
+  ['jj split <file…>', 'split a commit in two by file paths'],
   ['jj file untrack <file>', 'stop tracking a file (add it to .gitignore first)'],
   ['jj revert -r <rev> -d <dest>', 'create an inverse commit (for immutable history)'],
   ['echo <text> > <file> · cat <file> · ls · rm <file>', 'tiny shell — files snapshot into @ automatically'],
+  ['git status · git log · git branch', "the colocated-repo view through git's eyes (read-only mock)"],
   ['jj log · jj st · jj resolve', 'inspect the repo / conflict help'],
   ['check', 'compare your graph with the goal and list what differs'],
   ['levels · hint · solution · reset · objective · clear', 'playground commands'],
@@ -229,12 +232,7 @@ function exec(raw) {
     else print('No next level — try "levels" or "sandbox".', 'dim');
     return;
   }
-  if (bare.startsWith('git ') || bare === 'git') {
-    print('This is a jj playground — but fair guess!', 'err');
-    print('Hint: real jj works inside git repos too (jj git init --colocate). Try the jj spelling — e.g. jj git push. "help" lists commands.', 'dim');
-    return;
-  }
-  if (!/^(jj|echo|cat|rm|ls)( |$)/.test(bare)) {
+  if (!/^(jj|git|echo|cat|rm|ls)( |$)/.test(bare)) {
     print(`Unknown command "${line.split(' ')[0]}". Type "help".`, 'err');
     return;
   }

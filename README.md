@@ -8,7 +8,7 @@ in a terminal, watch the change graph respond, match the goal state to clear eac
 
 ## What it teaches
 
-25 levels across 8 sequences:
+31 levels across 11 sequences:
 
 1. **The Basics** — the working copy as a commit (`@`), `describe`, `new`, `commit`,
    `squash`, `abandon`, and automatic descendant rebasing.
@@ -27,6 +27,13 @@ in a terminal, watch the change graph respond, match the goal state to clear eac
 8. **Oops: Secrets & History Surgery** — removing a secret before pushing, from a
    pushed feature branch (rewrite + repush), and from immutable trunk (`jj revert`
    + rotate the credential).
+9. **History Surgery II** — `jj absorb` (auto-amend into the right ancestors),
+   `jj split` by paths, and backporting with `jj duplicate` + rebase.
+10. **The jj ⨯ git Field Guide** — why `jj undo` cannot un-push (the op log is
+    local; fetch proves it), and colocated-repo survival: detached HEAD is normal,
+    read-only git is safe, history-rewriting git commands are not.
+11. **Graduation** — a full day: fetch, rebase onto a moved trunk, resolve the
+    conflict at the source, absorb a review fix, push.
 
 Plus a free-play sandbox (`sandbox` in the terminal or via level select).
 
