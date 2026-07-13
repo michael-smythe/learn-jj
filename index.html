@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learn jj — an interactive Jujutsu tutorial</title>
+<meta name="description" content="Learn the Jujutsu (jj) version control system interactively: type jj commands, watch the change graph respond. Inspired by Learn Git Branching.">
+<link rel="stylesheet" href="style.css?v=3">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥋</text></svg>">
+</head>
+<body>
+
+<header>
+  <div class="logo"><span class="p">$</span> learn <span class="jj">jj</span></div>
+  <div id="levelName"></div>
+  <div class="btns">
+    <button id="btnLevels">Levels</button>
+    <button id="btnIntroAgain" title="Re-read this level's intro">Intro</button>
+    <button id="btnHint">Hint</button>
+    <button id="btnReset">Reset</button>
+    <button id="btnGoalToggle" title="Show / hide the goal">Goal</button>
+    <button id="btnHelp">Help</button>
+  </div>
+</header>
+
+<main>
+  <section id="terminal">
+    <div id="objectiveBar"><span class="objLabel">Objective</span><span id="objectiveText"></span></div>
+    <div id="termOut"></div>
+    <div id="termInputRow">
+      <span class="prompt">$</span>
+      <input id="termInput" autocomplete="off" spellcheck="false" placeholder="jj …" autofocus>
+    </div>
+  </section>
+
+  <section id="graphArea">
+    <div id="graphPane">
+      <svg id="mainGraph" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="winBanner" class="hidden">✓ Level solved!</div>
+    </div>
+    <aside id="goalPane">
+      <h2>Goal</h2>
+      <svg id="goalGraph" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="goalNote">Match this shape — descriptions, bookmarks, and where <b>@</b> ends up.
+        Change IDs of nodes you create may differ.</div>
+    </aside>
+  </section>
+</main>
+
+<div id="introModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modalHead"><h2 id="introTitle"></h2><button class="modalClose">✕</button></div>
+    <div class="modalBody" id="introBody"></div>
+    <div class="modalFoot">
+      <button id="introPrev">◂ Back</button>
+      <span id="introDots"></span>
+      <button id="introNext">Next ▸</button>
+    </div>
+  </div>
+</div>
+
+<div id="winModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modalBody">
+      <div class="winEmoji">🎉</div>
+      <h2>Level complete!</h2>
+      <p id="winStats"></p>
+    </div>
+    <div class="modalFoot">
+      <button id="winStay">Keep playing here</button>
+      <button id="winLevels">Level select</button>
+      <button id="winNext">Next level ▸</button>
+    </div>
+  </div>
+</div>
+
+<div id="levelsModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modalHead"><h2>Levels</h2><button class="modalClose">✕</button></div>
+    <div class="modalBody" id="levelList"></div>
+  </div>
+</div>
+
+<script src="js/engine.js?v=3"></script>
+<script src="js/graph.js?v=3"></script>
+<script src="js/levels.js?v=3"></script>
+<script src="js/main.js?v=3"></script>
+</body>
+</html>

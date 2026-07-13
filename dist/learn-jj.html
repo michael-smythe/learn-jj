@@ -1,0 +1,2631 @@
+<meta charset="utf-8">
+<title>Learn jj — an interactive Jujutsu tutorial</title>
+<style>
+/* learn-jj — dark, terminal-first. Palette loosely based on Tokyo Night. */
+:root {
+  --bg: #0d1017;
+  --panel: #131722;
+  --panel2: #171c2a;
+  --border: #262d40;
+  --text: #d5dae6;
+  --dim: #6b7394;
+  --accent: #7aa2f7;
+  --green: #9ece6a;
+  --red: #f7768e;
+  --purple: #bb9af7;
+  --yellow: #e0af68;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--sans); font-size: 14px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* ---------------- header ---------------- */
+header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 16px; height: 52px; flex: none;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.logo { font-family: var(--mono); font-weight: 700; font-size: 17px; white-space: nowrap; }
+.logo .p { color: var(--green); }
+.logo .jj { color: var(--purple); }
+#levelName {
+  font-family: var(--mono); font-size: 12.5px; color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+}
+header .btns { display: flex; gap: 8px; }
+button {
+  font-family: var(--sans); font-size: 12.5px; cursor: pointer;
+  background: var(--panel2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 7px; padding: 6px 12px;
+}
+button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------------- layout ---------------- */
+main { flex: 1; display: flex; min-height: 0; }
+
+#terminal {
+  width: 40%; min-width: 340px; max-width: 560px;
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border); background: var(--panel);
+}
+#objectiveBar {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-size: 12.5px; line-height: 1.45; background: var(--panel2);
+}
+#objectiveBar .objLabel { color: var(--yellow); font-weight: 600; margin-right: 6px; }
+#termOut {
+  flex: 1; overflow-y: auto; padding: 10px 14px;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
+}
+.tline { white-space: pre-wrap; word-break: break-word; }
+.t-cmd { color: var(--accent); font-weight: 600; margin-top: 6px; }
+.t-cmd2 { color: var(--accent); }
+.t-err { color: var(--red); }
+.t-ok { color: var(--green); }
+.t-dim { color: var(--dim); }
+#termInputRow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-top: 1px solid var(--border);
+}
+#termInputRow .prompt { font-family: var(--mono); color: var(--green); font-weight: 700; }
+#termInput {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--text); font-family: var(--mono); font-size: 13px; caret-color: var(--green);
+}
+
+/* ---------------- graph area ---------------- */
+#graphArea { flex: 1; display: flex; min-width: 0; position: relative; }
+#graphPane { flex: 1; min-width: 0; position: relative; }
+#mainGraph, #goalGraph { width: 100%; height: 100%; display: block; }
+
+#winBanner {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  background: color-mix(in srgb, var(--green) 18%, var(--panel));
+  border: 1px solid var(--green); color: var(--green);
+  padding: 6px 16px; border-radius: 999px; font-weight: 600; font-size: 13px;
+  pointer-events: none;
+}
+
+#goalPane {
+  width: 280px; flex: none; display: flex; flex-direction: column;
+  border-left: 1px solid var(--border); background: var(--panel);
+  transition: width .25s ease;
+}
+#goalPane.collapsed { width: 0; overflow: hidden; border-left: none; }
+#goalPane h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .12em;
+  color: var(--yellow); padding: 12px 14px 8px; font-weight: 700;
+}
+#goalGraph { flex: 1; }
+#goalPane .goalNote { padding: 10px 14px; font-size: 11.5px; color: var(--dim); line-height: 1.5; }
+body.sandbox #goalPane { display: none; }
+
+/* ---------------- svg graph ---------------- */
+.edge { fill: none; stroke: #3b4261; stroke-width: 2; }
+.nodeCircle.described { fill: #1c2534; stroke: var(--accent); stroke-width: 2; }
+.nodeCircle.empty { fill: rgba(255,255,255,0.02); stroke: var(--dim); stroke-width: 1.6; stroke-dasharray: 4 4; }
+.nodeRoot { fill: #1a1f2e; stroke: #414868; stroke-width: 2; }
+.nodeRootText { fill: var(--dim) !important; font-size: 9px !important; }
+.nodeDescText { fill: var(--text); font-size: 12.5px; font-weight: 600; font-family: var(--sans); }
+.nodeEmptyText { fill: var(--dim); font-size: 9px; font-style: italic; font-family: var(--sans); }
+.nodeId { font-family: var(--mono); font-size: 10.5px; }
+.nodeIdHi { fill: var(--purple); font-weight: 700; }
+.nodeIdLo { fill: #4c5578; }
+.wcRing { fill: none; stroke: var(--green); stroke-width: 2; opacity: .85; }
+.wcBadgeBg { fill: var(--green); }
+.wcBadgeText { fill: #0d1017; font-weight: 800; font-size: 13px; font-family: var(--mono); }
+.bookmarkChip rect { fill: color-mix(in srgb, var(--purple) 22%, var(--panel)); stroke: var(--purple); stroke-width: 1; }
+.bookmarkChip text { fill: var(--purple); font-size: 10.5px; font-family: var(--mono); font-weight: 600; }
+.remoteChip rect { fill: color-mix(in srgb, #73daca 16%, var(--panel)); stroke: #73daca; stroke-width: 1; }
+.remoteChip text { fill: #73daca; font-size: 10px; font-family: var(--mono); font-weight: 600; }
+.remoteChip.stale rect { stroke-dasharray: 3 3; opacity: .75; }
+.remoteChip.stale text { opacity: .75; }
+.nodeCircle.conflicted { stroke: var(--red) !important; }
+.nodeCircle.immutable { stroke: #565f89; }
+.conflictBadge circle { fill: var(--red); }
+.conflictBadge text { fill: #0d1017; font-weight: 800; font-size: 13px; }
+.immuMark { fill: #565f89; font-size: 9px; }
+
+/* ---------------- modals ---------------- */
+.overlay {
+  position: fixed; inset: 0; background: rgba(5, 7, 12, .72);
+  display: flex; align-items: center; justify-content: center; z-index: 40;
+}
+.overlay.hidden, .hidden { display: none; }
+.modal {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  width: min(620px, calc(100vw - 40px)); max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column; box-shadow: 0 24px 70px rgba(0,0,0,.55);
+}
+.modalHead {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 0;
+}
+.modalHead h2 { font-size: 17px; }
+.modalClose { border: none; background: none; color: var(--dim); font-size: 18px; padding: 4px 8px; }
+.modalBody { padding: 14px 20px 20px; overflow-y: auto; line-height: 1.6; font-size: 13.5px; }
+.modalBody p + p, .modalBody p + ul, .modalBody ul + p { margin-top: 10px; }
+.modalBody ul { padding-left: 20px; }
+.modalBody code {
+  font-family: var(--mono); font-size: 12px; background: var(--panel2);
+  border: 1px solid var(--border); border-radius: 5px; padding: 1.5px 5px; color: var(--accent);
+}
+.modalBody a { color: var(--accent); }
+.cardNote { color: var(--dim); font-size: 12.5px; }
+.modalFoot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px 18px; border-top: 1px solid var(--border);
+}
+#introDots { color: var(--dim); font-size: 11px; letter-spacing: .3em; }
+
+/* win modal */
+#winModal .modal { width: min(430px, calc(100vw - 40px)); text-align: center; }
+#winModal .modalBody { padding-top: 22px; }
+.winEmoji { font-size: 44px; }
+#winModal h2 { margin: 8px 0 6px; font-size: 20px; color: var(--green); }
+#winStats { color: var(--dim); }
+#winModal .modalFoot { justify-content: center; gap: 10px; border-top: none; padding-top: 4px; }
+#winNext { background: var(--green); color: #0d1017; border-color: var(--green); font-weight: 700; }
+#winNext:hover { color: #0d1017; filter: brightness(1.1); }
+
+/* level select */
+#levelsModal .modal { width: min(720px, calc(100vw - 40px)); }
+.seqHeader { margin: 14px 0 8px; }
+.seqTitle { font-weight: 700; font-size: 14.5px; color: var(--yellow); }
+.seqBlurb { color: var(--dim); font-size: 12px; margin-top: 2px; }
+.levelGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.levelCard {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 10px 12px; border-radius: 9px;
+}
+.levelCard .lvNum {
+  font-family: var(--mono); color: var(--dim); font-size: 12px;
+  width: 20px; text-align: right; flex: none;
+}
+.levelCard .lvTitle { flex: 1; font-size: 12.5px; }
+.levelCard .lvCheck { color: var(--green); font-weight: 700; }
+.levelCard.solved { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
+.sandboxCard { margin-top: 14px; width: 100%; }
+
+/* ---------------- narrow screens ---------------- */
+@media (max-width: 760px) {
+  main { flex-direction: column; }
+  #terminal { width: 100%; max-width: none; height: 45%; border-right: none; border-top: 1px solid var(--border); order: 2; }
+  #graphArea { order: 1; }
+  #goalPane { position: absolute; right: 0; top: 0; bottom: 0; z-index: 5; }
+  header { gap: 8px; padding: 0 10px; }
+  .logo { font-size: 14px; }
+}
+
+/* host-page embedding: the app owns the viewport */
+html, body { height: 100%; margin: 0; padding: 0; }
+</style>
+
+
+<header>
+  <div class="logo"><span class="p">$</span> learn <span class="jj">jj</span></div>
+  <div id="levelName"></div>
+  <div class="btns">
+    <button id="btnLevels">Levels</button>
+    <button id="btnIntroAgain" title="Re-read this level's intro">Intro</button>
+    <button id="btnHint">Hint</button>
+    <button id="btnReset">Reset</button>
+    <button id="btnGoalToggle" title="Show / hide the goal">Goal</button>
+    <button id="btnHelp">Help</button>
+  </div>
+</header>
+
+<main>
+  <section id="terminal">
+    <div id="objectiveBar"><span class="objLabel">Objective</span><span id="objectiveText"></span></div>
+    <div id="termOut"></div>
+    <div id="termInputRow">
+      <span class="prompt">$</span>
+      <input id="termInput" autocomplete="off" spellcheck="false" placeholder="jj …" autofocus>
+    </div>
+  </section>
+
+  <section id="graphArea">
+    <div id="graphPane">
+      <svg id="mainGraph" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="winBanner" class="hidden">✓ Level solved!</div>
+    </div>
+    <aside id="goalPane">
+      <h2>Goal</h2>
+      <svg id="goalGraph" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="goalNote">Match this shape — descriptions, bookmarks, and where <b>@</b> ends up.
+        Change IDs of nodes you create may differ.</div>
+    </aside>
+  </section>
+</main>
+
+<div id="introModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modalHead"><h2 id="introTitle"></h2><button class="modalClose">✕</button></div>
+    <div class="modalBody" id="introBody"></div>
+    <div class="modalFoot">
+      <button id="introPrev">◂ Back</button>
+      <span id="introDots"></span>
+      <button id="introNext">Next ▸</button>
+    </div>
+  </div>
+</div>
+
+<div id="winModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modalBody">
+      <div class="winEmoji">🎉</div>
+      <h2>Level complete!</h2>
+      <p id="winStats"></p>
+    </div>
+    <div class="modalFoot">
+      <button id="winStay">Keep playing here</button>
+      <button id="winLevels">Level select</button>
+      <button id="winNext">Next level ▸</button>
+    </div>
+  </div>
+</div>
+
+<div id="levelsModal" class="overlay hidden">
+  <div class="modal">
+    <div class="modalHead"><h2>Levels</h2><button class="modalClose">✕</button></div>
+    <div class="modalBody" id="levelList"></div>
+  </div>
+</div>
+
+
+<script>
+/*
+ * engine.js — a teaching simulator of Jujutsu's core model.
+ *
+ * Models changes (with stable change IDs and rewritable commit IDs), the
+ * working-copy commit (@), bookmarks, automatic descendant rebasing, and the
+ * operation log. File contents are abstracted away: a change's "work" is
+ * represented by its description.
+ */
+(function (global) {
+'use strict';
+
+const CHANGE_ALPHABET = 'klmnopqrstuvwxyz';
+const ROOT_ID = 'zzzzzzzz';
+const HEX = '0123456789abcdef';
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+class JJError extends Error {
+  constructor(msg, hint) { super(msg); this.hint = hint; }
+}
+
+function tokenize(line) {
+  const toks = []; let cur = ''; let q = null; let pending = false;
+  for (const ch of line) {
+    if (q) { if (ch === q) q = null; else cur += ch; }
+    else if (ch === '"' || ch === "'") { q = ch; pending = true; }
+    else if (/\s/.test(ch)) { if (cur || pending) { toks.push(cur); cur = ''; pending = false; } }
+    else cur += ch;
+  }
+  if (q) throw new JJError('Unclosed quote in command');
+  if (cur || pending) toks.push(cur);
+  return toks;
+}
+
+function parseArgs(tokens, spec) {
+  const lookup = {};
+  for (const [canon, def] of Object.entries(spec)) {
+    lookup[canon] = canon;
+    (def.aliases || []).forEach(a => { lookup[a] = canon; });
+  }
+  const flags = {}; const pos = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (tok.length > 1 && tok[0] === '-' && tok !== '--') {
+      let name = tok.replace(/^--?/, ''); let inlineVal = null;
+      const eq = name.indexOf('=');
+      if (eq >= 0) { inlineVal = name.slice(eq + 1); name = name.slice(0, eq); }
+      const canon = lookup[name];
+      if (!canon) throw new JJError(`Unexpected argument "${tok}"`, 'Type "help" to see what this playground supports.');
+      const def = spec[canon];
+      let val = true;
+      if (def.value) {
+        if (inlineVal !== null) val = inlineVal;
+        else { i++; if (i >= tokens.length) throw new JJError(`Option "${tok}" requires a value`); val = tokens[i]; }
+      }
+      if (def.multi) (flags[canon] = flags[canon] || []).push(val);
+      else flags[canon] = val;
+    } else pos.push(tok);
+  }
+  return { flags, pos };
+}
+
+const TRUNK_NAMES = ['main', 'master', 'trunk'];
+const isConflict = v => v !== null && typeof v === 'object' && 'conflict' in v;
+const valEq = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+class JJEngine {
+  constructor(seed = 1) {
+    this._rand = mulberry32((seed * 0x9E3779B9) >>> 0);
+    this.counter = 0;
+    this.changes = new Map();
+    this.bookmarks = new Map();
+    this.remote = new Map();      // name -> {id, commitId} (state of name@origin)
+    this.remoteScript = [];       // scripted colleague activity, revealed by jj git fetch
+    this.fetchCount = 0;
+    this.ops = [];
+    this.undoCursor = null;
+    const root = { id: ROOT_ID, commitId: '00000000', desc: '', parents: [], immutable: true, files: {} };
+    this.changes.set(ROOT_ID, root);
+    const first = this._createChange([ROOT_ID], '');
+    this.wc = first.id;
+    this._recordOp('initialize repo');
+  }
+
+  setRemoteScript(script) { this.remoteScript = script || []; }
+
+  /* ---------- id + change helpers ---------- */
+
+  _randHex(n) { let s = ''; for (let i = 0; i < n; i++) s += HEX[(this._rand() * 16) | 0]; return s; }
+
+  _newChangeId() {
+    const c = this.counter++;
+    let id = CHANGE_ALPHABET[(c >> 4) & 15] + CHANGE_ALPHABET[c & 15];
+    for (let i = 0; i < 6; i++) id += CHANGE_ALPHABET[(this._rand() * 16) | 0];
+    return id;
+  }
+
+  _createChange(parents, desc, files) {
+    const ch = {
+      id: this._newChangeId(), commitId: this._randHex(8), desc: desc || '',
+      parents: parents.slice(), immutable: false,
+      files: files ? JSON.parse(JSON.stringify(files)) : {},
+    };
+    this.changes.set(ch.id, ch);
+    return ch;
+  }
+
+  get(id) { return this.changes.get(id); }
+
+  childrenOf(id) {
+    const out = [];
+    for (const ch of this.changes.values()) if (ch.parents.includes(id)) out.push(ch.id);
+    return out;
+  }
+
+  descendantsOf(id, incl = true) {
+    const seen = new Set(incl ? [id] : []);
+    const queue = [id];
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const kid of this.childrenOf(cur)) {
+        if (!seen.has(kid)) { seen.add(kid); queue.push(kid); }
+      }
+    }
+    if (!incl) seen.delete(id);
+    return seen;
+  }
+
+  ancestorsOf(id, incl = true) {
+    const seen = new Set();
+    const start = this.get(id);
+    const queue = incl ? [id] : (start ? start.parents.slice() : []);
+    while (queue.length) {
+      const cur = queue.shift();
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      const c = this.get(cur);
+      if (c) queue.push(...c.parents);
+    }
+    return seen;
+  }
+
+  bookmarksAt(id) {
+    const out = [];
+    for (const [name, target] of this.bookmarks) if (target === id) out.push(name);
+    return out.sort();
+  }
+
+  remoteBookmarksAt(id) {
+    const out = [];
+    for (const [name, ref] of this.remote) if (ref.id === id) out.push(name);
+    return out.sort();
+  }
+
+  /* ---------- file trees ----------
+   * Each change carries patches: files[name] = {from, to} (to === null deletes).
+   * The tree at a commit = merged parent trees + own patches. A patch whose
+   * `from` no longer matches the parent value produces a conflict value, which
+   * flows into descendants until some commit writes the file again — modelling
+   * jj's "conflicts live in commits" design. */
+
+  _lca(a, b) {
+    const ancA = this.ancestorsOf(a, true);
+    const shared = [...this.ancestorsOf(b, true)].filter(x => ancA.has(x));
+    if (!shared.length) return null;
+    const row = this._rows();
+    shared.sort((x, y) => row[y] - row[x]);
+    return shared[0];
+  }
+
+  _merge3(base, a, b) {
+    const out = {};
+    const keys = new Set([...Object.keys(base), ...Object.keys(a), ...Object.keys(b)]);
+    for (const f of keys) {
+      const bv = base[f] ?? null, av = a[f] ?? null, cv = b[f] ?? null;
+      let v;
+      if (valEq(av, cv)) v = av;
+      else if (valEq(av, bv)) v = cv;
+      else if (valEq(cv, bv)) v = av;
+      else v = { conflict: { base: bv, sides: [av, cv] } };
+      if (v !== null) out[f] = v;
+    }
+    return out;
+  }
+
+  computeTrees() {
+    const row = this._rows();
+    const order = [...this.changes.keys()].sort((a, b) => row[a] - row[b]);
+    const trees = new Map();
+    for (const id of order) {
+      const c = this.get(id);
+      let tree;
+      const ps = c.parents.filter(p => trees.has(p));
+      if (!ps.length) tree = {};
+      else if (ps.length === 1) tree = { ...trees.get(ps[0]) };
+      else {
+        tree = trees.get(ps[0]);
+        let accId = ps[0];
+        for (let i = 1; i < ps.length; i++) {
+          const baseId = this._lca(accId, ps[i]);
+          tree = this._merge3(baseId ? trees.get(baseId) : {}, tree, trees.get(ps[i]));
+          accId = baseId ?? accId;
+        }
+        tree = { ...tree };
+      }
+      for (const [f, patch] of Object.entries(c.files)) {
+        const cur = tree[f] ?? null;
+        const from = patch.from ?? null, to = patch.to ?? null;
+        let next;
+        if (isConflict(cur)) next = to;         // writing a conflicted file resolves it
+        else if (valEq(cur, to)) next = to;
+        else if (valEq(cur, from)) next = to;   // clean 3-way apply
+        else next = { conflict: { base: from, sides: [cur, to] } };
+        if (next === null) delete tree[f]; else tree[f] = next;
+      }
+      trees.set(id, tree);
+    }
+    return trees;
+  }
+
+  /* Tree the working copy sees before its own patches. */
+  _baseTreeOf(id, trees) {
+    const c = this.get(id);
+    const saved = c.files;
+    c.files = {};
+    const t = this.computeTrees().get(id);
+    c.files = saved;
+    return t || {};
+  }
+
+  _conflictedIds(trees) {
+    trees = trees || this.computeTrees();
+    const out = new Set();
+    for (const [id, tree] of trees) {
+      if (Object.values(tree).some(isConflict)) out.add(id);
+    }
+    return out;
+  }
+
+  /* ---------- immutability: root + everything on the pushed trunk ---------- */
+
+  _trunkName() {
+    for (const n of TRUNK_NAMES) if (this.remote.has(n)) return n;
+    return null;
+  }
+
+  _immutableIds() {
+    const set = new Set([ROOT_ID]);
+    const trunk = this._trunkName();
+    if (trunk) for (const a of this.ancestorsOf(this.remote.get(trunk).id, true)) set.add(a);
+    return set;
+  }
+
+  _touch(ids) {
+    for (const id of ids) {
+      const c = this.get(id);
+      if (c && !c.immutable) c.commitId = this._randHex(8);
+    }
+  }
+
+  _rows() {
+    const row = {}; const indeg = {}; const queue = [];
+    for (const c of this.changes.values()) {
+      indeg[c.id] = c.parents.length;
+      if (!c.parents.length) { row[c.id] = 0; queue.push(c.id); }
+    }
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const kid of this.childrenOf(cur)) {
+        row[kid] = Math.max(row[kid] || 0, row[cur] + 1);
+        if (--indeg[kid] === 0) queue.push(kid);
+      }
+    }
+    return row;
+  }
+
+  short(id) { return id.slice(0, 3); }
+
+  _descOf(c) { return c.desc ? c.desc : '(no description set)'; }
+
+  _fmt(id) {
+    const c = this.get(id);
+    return `${this.short(id)} ${c.commitId.slice(0, 8)} ${this._descOf(c)}`;
+  }
+
+  _wcLines() {
+    const lines = [{ t: `Working copy  (@) now at: ${this._fmt(this.wc)}`, c: 'ok' }];
+    for (const p of this.get(this.wc).parents) {
+      lines.push({ t: `Parent commit (@-)      : ${this._fmt(p)}`, c: 'dim' });
+    }
+    return lines;
+  }
+
+  /* Moving @ away from an empty, undescribed, childless, bookmark-free change
+   * abandons it automatically — just like real jj. */
+  _moveWC(newId, lines, protect) {
+    const old = this.wc;
+    this.wc = newId;
+    if (!old || old === newId || (protect && protect.has(old))) return;
+    const c = this.get(old);
+    if (c && !c.immutable && !c.desc && Object.keys(c.files).length === 0 &&
+        this.childrenOf(old).length === 0 && this.bookmarksAt(old).length === 0 &&
+        this.remoteBookmarksAt(old).length === 0) {
+      this.changes.delete(old);
+      lines.push({ t: `(cleaned up the empty, undescribed change ${this.short(old)})`, c: 'dim' });
+    }
+  }
+
+  _checkRewritable(id) {
+    const c = this.get(id);
+    if (this._immutableIds().has(id)) {
+      throw new JJError(`Commit ${c.commitId.slice(0, 8)} is immutable`,
+        id === ROOT_ID
+          ? 'The root commit cannot be rewritten or edited.'
+          : `Commits reachable from ${this._trunkName()}@origin are immutable — build on top with jj new, create an inverse commit with jj revert, or jj undo the push.`);
+    }
+  }
+
+  /* ---------- revset resolution ---------- */
+
+  resolve(expr) {
+    let e = (expr || '').trim().replace(/^["']|["']$/g, '');
+    if (!e) throw new JJError('Empty revision');
+    const sufs = [];
+    while (e.endsWith('-') || e.endsWith('+')) { sufs.push(e.slice(-1)); e = e.slice(0, -1); }
+    sufs.reverse();
+    let cur = this._resolveBase(e, expr);
+    for (const s of sufs) {
+      if (s === '-') {
+        const ps = this.get(cur).parents;
+        if (!ps.length) throw new JJError(`"${expr}" resolved to no revisions (the root commit has no parents)`);
+        if (ps.length > 1) throw new JJError(`"${expr}" resolved to more than one revision`, 'That change is a merge — refer to the parent you want by its change ID.');
+        cur = ps[0];
+      } else {
+        const cs = this.childrenOf(cur);
+        if (!cs.length) throw new JJError(`"${expr}" resolved to no revisions (no children)`);
+        if (cs.length > 1) throw new JJError(`"${expr}" resolved to more than one revision`, 'That change has several children — refer to the one you want by its change ID.');
+        cur = cs[0];
+      }
+    }
+    return cur;
+  }
+
+  _resolveBase(e, orig) {
+    if (e === '@') return this.wc;
+    if (e === 'root()') return ROOT_ID;
+    const dm = e.match(/^desc(?:ription)?\((.*)\)$/);
+    if (dm) {
+      const pat = dm[1].replace(/^["']|["']$/g, '');
+      let hits = [...this.changes.values()].filter(c => c.desc === pat).map(c => c.id);
+      if (!hits.length) hits = [...this.changes.values()].filter(c => c.desc.includes(pat) && c.desc).map(c => c.id);
+      if (!hits.length) throw new JJError(`Revset "${orig}" didn't resolve to any revisions`);
+      if (hits.length > 1) throw new JJError(`Revset "${orig}" resolved to more than one revision`);
+      return hits[0];
+    }
+    if (this.bookmarks.has(e)) return this.bookmarks.get(e);
+    if (/^[k-z]+$/.test(e)) {
+      const hits = [...this.changes.keys()].filter(id => id.startsWith(e));
+      if (hits.length === 1) return hits[0];
+      if (hits.length > 1) throw new JJError(`Change ID prefix "${e}" is ambiguous`, 'Add more letters from the ID shown in the graph.');
+    }
+    throw new JJError(`Revision "${orig}" doesn't exist`, 'Use a change ID from the graph, a bookmark name, @, or suffixes like @-.');
+  }
+
+  /* ---------- op log ---------- */
+
+  _snapshot() {
+    return {
+      wc: this.wc,
+      changes: [...this.changes.values()].map(c => ({ ...c, parents: c.parents.slice(), files: JSON.parse(JSON.stringify(c.files)) })),
+      bookmarks: [...this.bookmarks],
+      remote: [...this.remote].map(([n, r]) => [n, { ...r }]),
+      fetchCount: this.fetchCount,
+    };
+  }
+
+  _restore(snap) {
+    this.changes = new Map(snap.changes.map(c => [c.id, { ...c, parents: c.parents.slice(), files: JSON.parse(JSON.stringify(c.files)) }]));
+    this.bookmarks = new Map(snap.bookmarks);
+    this.remote = new Map((snap.remote || []).map(([n, r]) => [n, { ...r }]));
+    this.fetchCount = snap.fetchCount || 0;
+    this.wc = snap.wc;
+  }
+
+  _recordOp(desc) {
+    this.ops.push({ id: this._randHex(12), desc, snap: this._snapshot() });
+  }
+
+  _restoreLast() {
+    if (this.ops.length) this._restore(this.ops[this.ops.length - 1].snap);
+  }
+
+  /* ---------- command dispatch ---------- */
+
+  run(line) {
+    let tokens;
+    try { tokens = tokenize(line); }
+    catch (e) { return { ok: false, lines: [{ t: 'Error: ' + e.message, c: 'err' }] }; }
+    if (!tokens.length) return { ok: true, lines: [] };
+
+    const shell = { echo: '_shEcho', cat: '_shCat', rm: '_shRm', ls: '_shLs' };
+    let method, args;
+    if (tokens[0] !== 'jj') {
+      method = shell[tokens[0]];
+      args = tokens.slice(1);
+      if (!method) return { ok: false, lines: [{ t: `Unknown command "${tokens[0]}"`, c: 'err' }] };
+    } else {
+      const sub = tokens[1];
+      args = tokens.slice(2);
+      const table = {
+        new: '_cmdNew', describe: '_cmdDescribe', desc: '_cmdDescribe',
+        commit: '_cmdCommit', edit: '_cmdEdit', abandon: '_cmdAbandon',
+        squash: '_cmdSquash', rebase: '_cmdRebase', bookmark: '_cmdBookmark',
+        b: '_cmdBookmark', duplicate: '_cmdDuplicate', undo: '_cmdUndo',
+        op: '_cmdOp', operation: '_cmdOp', log: '_cmdLog', status: '_cmdStatus', st: '_cmdStatus',
+        git: '_cmdGit', revert: '_cmdRevert', backout: '_cmdRevert',
+        file: '_cmdFile', resolve: '_cmdResolve',
+      };
+      if (!sub) {
+        return { ok: true, lines: [{ t: 'jj — a version control system (playground). Type "help" for commands.', c: 'dim' }] };
+      }
+      method = table[sub];
+      if (!method) {
+        return { ok: false, lines: [
+          { t: `Error: unrecognized subcommand "${sub}"`, c: 'err' },
+          { t: 'Hint: type "help" to see what this playground supports.', c: 'dim' },
+        ] };
+      }
+    }
+    const conflictsBefore = this._conflictedIds();
+    try {
+      const res = this[method](args);
+      if (res.op) {
+        this._recordOp(res.op);
+        if (!res.keepUndoCursor) this.undoCursor = null;
+        const after = this._conflictedIds();
+        const appeared = [...after].filter(id => !conflictsBefore.has(id)).map(id => this.short(id));
+        const resolved = [...conflictsBefore].filter(id => !after.has(id) && this.changes.has(id)).map(id => this.short(id));
+        if (appeared.length) res.lines.push({ t: `New conflicts appeared in these commits: ${appeared.join(', ')}`, c: 'err' });
+        if (resolved.length) res.lines.push({ t: `Existing conflicts were resolved or abandoned: ${resolved.join(', ')}`, c: 'ok' });
+      }
+      return { ok: true, lines: res.lines, mutated: !!res.op };
+    } catch (e) {
+      if (e instanceof JJError) {
+        this._restoreLast();
+        const lines = [{ t: 'Error: ' + e.message, c: 'err' }];
+        if (e.hint) lines.push({ t: 'Hint: ' + e.hint, c: 'dim' });
+        return { ok: false, lines };
+      }
+      throw e;
+    }
+  }
+
+  /* ---------- commands ---------- */
+
+  _cmdNew(args) {
+    const { flags, pos } = parseArgs(args, {
+      m: { value: true, aliases: ['message'] },
+      B: { value: true, aliases: ['insert-before'] },
+      A: { value: true, aliases: ['insert-after'] },
+      'no-edit': {},
+    });
+    if (flags.B && flags.A) throw new JJError('This playground supports either --insert-before or --insert-after, not both');
+    const msg = typeof flags.m === 'string' ? flags.m : '';
+    const lines = [];
+    let node;
+    let rebased = 0;
+    if (flags.B) {
+      const target = this.resolve(flags.B);
+      this._checkRewritable(target);
+      const tc = this.get(target);
+      node = this._createChange(tc.parents, msg);
+      tc.parents = [node.id];
+      const moved = this.descendantsOf(target, true);
+      rebased = moved.size;
+      this._touch(moved);
+      this._moveWC(node.id, lines, new Set([target]));
+    } else if (flags.A) {
+      const target = this.resolve(flags.A);
+      node = this._createChange([target], msg);
+      const touched = new Set();
+      for (const kidId of this.childrenOf(target)) {
+        if (kidId === node.id) continue;
+        const kid = this.get(kidId);
+        this._checkRewritable(kidId);
+        kid.parents = kid.parents.map(p => (p === target ? node.id : p));
+        for (const d of this.descendantsOf(kidId, true)) touched.add(d);
+      }
+      rebased = touched.size;
+      this._touch(touched);
+      this._moveWC(node.id, lines, new Set([target]));
+    } else {
+      let parents = pos.length ? pos.map(p => this.resolve(p)) : [this.wc];
+      parents = [...new Set(parents)];
+      node = this._createChange(parents, msg);
+      this._moveWC(node.id, lines);
+    }
+    if (rebased) lines.push({ t: `Rebased ${rebased} descendant commits`, c: 'dim' });
+    lines.push(...this._wcLines());
+    return { op: 'new empty commit', lines };
+  }
+
+  _cmdDescribe(args) {
+    const { flags } = parseArgs(args, {
+      m: { value: true, aliases: ['message'] },
+      r: { value: true, aliases: ['revision'] },
+    });
+    if (typeof flags.m !== 'string') {
+      throw new JJError('A description is required', 'This playground has no editor — pass one with -m "my description".');
+    }
+    const rev = flags.r ? this.resolve(flags.r) : this.wc;
+    this._checkRewritable(rev);
+    this.get(rev).desc = flags.m;
+    this._touch(this.descendantsOf(rev, true));
+    const lines = [];
+    if (rev === this.wc) lines.push(...this._wcLines());
+    else lines.push({ t: `Described ${this.short(rev)} as "${flags.m}"`, c: 'ok' });
+    return { op: `describe commit ${this.short(rev)}`, lines };
+  }
+
+  _cmdCommit(args) {
+    const { flags } = parseArgs(args, { m: { value: true, aliases: ['message'] } });
+    if (typeof flags.m !== 'string') {
+      throw new JJError('A description is required', 'This playground has no editor — use jj commit -m "my description".');
+    }
+    const cur = this.get(this.wc);
+    cur.desc = flags.m;
+    this._touch(this.descendantsOf(this.wc, true));
+    const node = this._createChange([this.wc], '');
+    this.wc = node.id;
+    return { op: `commit working copy: "${flags.m}"`, lines: this._wcLines() };
+  }
+
+  _cmdEdit(args) {
+    const { pos } = parseArgs(args, {});
+    if (!pos.length) throw new JJError('jj edit needs a revision, e.g. jj edit kl');
+    const rev = this.resolve(pos[0]);
+    const c = this.get(rev);
+    if (this._immutableIds().has(rev)) {
+      throw new JJError(`Commit ${c.commitId.slice(0, 8)} is immutable`,
+        `Use "jj new ${this.short(rev)}" to create a new change on top of it instead${rev === 'zzzzzzzz' ? '' : ', or jj revert to invert it'}.`);
+    }
+    if (rev === this.wc) return { op: null, lines: [{ t: 'Already editing that change.', c: 'dim' }] };
+    const lines = [];
+    this._moveWC(rev, lines);
+    lines.push(...this._wcLines());
+    return { op: `edit commit ${this.short(rev)}`, lines };
+  }
+
+  _cmdAbandon(args) {
+    const { pos } = parseArgs(args, {});
+    const targets = pos.length ? pos.map(p => this.resolve(p)) : [this.wc];
+    const set = new Set(targets);
+    for (const t of set) this._checkRewritable(t);
+
+    const touch = new Set();
+    for (const t of set) for (const d of this.descendantsOf(t, false)) touch.add(d);
+
+    const lines = [];
+    const row = this._rows();
+    const ordered = [...set].sort((a, b) => row[b] - row[a]); // children first
+    const replacement = new Map();
+    const wcWasAbandoned = set.has(this.wc);
+    const oldWcParents = this.get(this.wc).parents.slice();
+
+    for (const x of ordered) {
+      const xc = this.get(x);
+      for (const kidId of this.childrenOf(x)) {
+        const kid = this.get(kidId);
+        const np = [];
+        for (const p of kid.parents) {
+          if (p === x) { for (const q of xc.parents) if (!np.includes(q) && q !== kidId) np.push(q); }
+          else if (!np.includes(p)) np.push(p);
+        }
+        kid.parents = np.length ? np : [ROOT_ID];
+      }
+      for (const name of this.bookmarksAt(x)) {
+        const to = xc.parents[0] || ROOT_ID;
+        this.bookmarks.set(name, to);
+        lines.push({ t: `Moved bookmark ${name} to ${this.short(to)}`, c: 'dim' });
+      }
+      replacement.set(x, xc.parents.slice());
+      lines.unshift({ t: `Abandoned commit ${this.short(x)} ${this._descOf(xc)}`, c: 'ok' });
+      this.changes.delete(x);
+    }
+
+    // Fix any bookmarks that cascaded onto a change abandoned later.
+    for (const [name, target] of this.bookmarks) {
+      let cur = target;
+      while (replacement.has(cur)) cur = replacement.get(cur)[0] || ROOT_ID;
+      if (cur !== target) this.bookmarks.set(name, cur);
+    }
+
+    const alive = [...touch].filter(id => this.changes.has(id));
+    this._touch(alive);
+    if (alive.length) lines.push({ t: `Rebased ${alive.length} descendant commits onto parents of abandoned commits`, c: 'dim' });
+
+    if (wcWasAbandoned) {
+      const expand = ids => {
+        const out = [];
+        for (const id of ids) {
+          if (replacement.has(id)) out.push(...expand(replacement.get(id)));
+          else if (!out.includes(id)) out.push(id);
+        }
+        return out;
+      };
+      let parents = expand(this.get.call(this, this.wc) ? [this.wc] : oldWcParents);
+      if (!parents.length) parents = [ROOT_ID];
+      const node = this._createChange(parents, '');
+      this.wc = node.id;
+      lines.push(...this._wcLines());
+    }
+    const what = [...set].map(id => this.short(id)).join(', ');
+    return { op: `abandon commit ${what}`, lines };
+  }
+
+  _cmdSquash(args) {
+    const { flags } = parseArgs(args, {
+      r: { value: true, aliases: ['revision'] },
+      m: { value: true, aliases: ['message'] },
+    });
+    const rev = flags.r ? this.resolve(flags.r) : this.wc;
+    this._checkRewritable(rev);
+    const rc = this.get(rev);
+    if (rc.parents.length !== 1) throw new JJError('Cannot squash merge commits', 'The change has more than one parent.');
+    const parentId = rc.parents[0];
+    this._checkRewritable(parentId);
+    const parent = this.get(parentId);
+
+    const lines = [];
+    if (typeof flags.m === 'string') parent.desc = flags.m;
+    else if (!parent.desc) parent.desc = rc.desc;
+    else if (rc.desc) lines.push({ t: `(kept the parent's description "${parent.desc}" — pass -m to set a combined one)`, c: 'dim' });
+    for (const [f, p] of Object.entries(rc.files)) {
+      parent.files[f] = parent.files[f]
+        ? { from: parent.files[f].from, to: p.to ?? null }
+        : { from: p.from ?? null, to: p.to ?? null };
+    }
+
+    for (const kidId of this.childrenOf(rev)) {
+      const kid = this.get(kidId);
+      const np = [];
+      for (const p of kid.parents) {
+        if (p === rev) { if (!np.includes(parentId)) np.push(parentId); }
+        else if (!np.includes(p)) np.push(p);
+      }
+      kid.parents = np;
+    }
+    for (const name of this.bookmarksAt(rev)) this.bookmarks.set(name, parentId);
+    const wasWC = rev === this.wc;
+    this.changes.delete(rev);
+    if (wasWC) {
+      const node = this._createChange([parentId], '');
+      this.wc = node.id;
+    }
+    this._touch(this.descendantsOf(parentId, true));
+    lines.unshift({ t: `Squashed ${this.short(rev)} into ${this.short(parentId)} ${this._descOf(parent)}`, c: 'ok' });
+    lines.push(...this._wcLines());
+    return { op: `squash commit ${this.short(rev)}`, lines };
+  }
+
+  _cmdRebase(args) {
+    const { flags } = parseArgs(args, {
+      r: { value: true, aliases: ['revision'] },
+      s: { value: true, aliases: ['source'] },
+      b: { value: true, aliases: ['branch'] },
+      d: { value: true, multi: true, aliases: ['destination'] },
+    });
+    const modes = ['r', 's', 'b'].filter(k => flags[k]);
+    if (modes.length > 1) throw new JJError('Use only one of -r, -s, -b');
+    let dests = (flags.d || []).map(d => this.resolve(d));
+    dests = [...new Set(dests)];
+    if (!dests.length) throw new JJError('A destination is required', 'Add -d <revision>, e.g. jj rebase -s kn -d main');
+
+    const mode = modes[0] || 'b';
+    const target = flags[mode] ? this.resolve(flags[mode]) : this.wc;
+
+    let moveSet;
+    if (mode === 'r') moveSet = new Set([target]);
+    else if (mode === 's') moveSet = this.descendantsOf(target, true);
+    else {
+      const ancT = this.ancestorsOf(target, true);
+      const ancD = new Set();
+      for (const d of dests) for (const a of this.ancestorsOf(d, true)) ancD.add(a);
+      const branch = [...ancT].filter(x => !ancD.has(x));
+      if (!branch.length) return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
+      const roots = branch.filter(x => this.get(x).parents.every(p => !branch.includes(p)));
+      moveSet = new Set();
+      for (const r of roots) for (const d of this.descendantsOf(r, true)) moveSet.add(d);
+    }
+    for (const id of moveSet) this._checkRewritable(id);
+    if (mode !== 'r') {
+      for (const d of dests) if (moveSet.has(d)) {
+        throw new JJError(`Cannot rebase ${this.short(target)} onto ${this.short(d)}: the destination is part of what's being moved`);
+      }
+    }
+
+    const sameParents = (a, b) => a.length === b.length && a.every(p => b.includes(p));
+    const touch = new Set();
+    const lines = [];
+    let healed = 0;
+
+    if (mode === 'r') {
+      const tc = this.get(target);
+      const kids = this.childrenOf(target);
+      if (sameParents(tc.parents, dests) && !kids.length) {
+        return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
+      }
+      for (const kidId of kids) {
+        const kid = this.get(kidId);
+        const np = [];
+        for (const p of kid.parents) {
+          if (p === target) { for (const q of tc.parents) if (!np.includes(q) && q !== kidId) np.push(q); }
+          else if (!np.includes(p)) np.push(p);
+        }
+        kid.parents = np.length ? np : [ROOT_ID];
+        for (const d of this.descendantsOf(kidId, true)) touch.add(d);
+        healed++;
+      }
+      tc.parents = dests.slice();
+      if (this.ancestorsOf(target, false).has(target)) {
+        throw new JJError(`Cannot rebase ${this.short(target)} onto ${this.short(dests[0])}: that would create a cycle`);
+      }
+    } else {
+      const roots = [...moveSet].filter(x => this.get(x).parents.every(p => !moveSet.has(p)));
+      let changed = false;
+      for (const r of roots) {
+        const rc = this.get(r);
+        if (!sameParents(rc.parents, dests)) { rc.parents = dests.slice(); changed = true; }
+      }
+      if (!changed) return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
+      if (dests.some(d => this.ancestorsOf(d, false).has(d) || this.ancestorsOf(d, true).size === 0)) {
+        throw new JJError('That rebase would create a cycle');
+      }
+    }
+
+    for (const id of moveSet) for (const d of this.descendantsOf(id, true)) touch.add(d);
+    this._touch(touch);
+    lines.push({ t: `Rebased ${moveSet.size} commits onto ${this.short(dests[0])}${dests.length > 1 ? ` (+${dests.length - 1} more parents)` : ''}`, c: 'ok' });
+    if (healed) lines.push({ t: `Rebased ${healed} descendant commits onto parent of ${this.short(target)}`, c: 'dim' });
+    if (touch.has(this.wc) || moveSet.has(this.wc)) lines.push(...this._wcLines());
+    return { op: `rebase ${moveSet.size} commits`, lines };
+  }
+
+  _cmdBookmark(args) {
+    const sub = args[0] || 'list';
+    const rest = args.slice(1);
+    const { flags, pos } = parseArgs(rest, {
+      r: { value: true, aliases: ['revision'] },
+      to: { value: true },
+    });
+    const nameOk = n => /^[A-Za-z][\w./-]*$/.test(n) && n !== 'root';
+
+    if (sub === 'list' || sub === 'l') {
+      const lines = [...this.bookmarks.keys()].sort().map(name => ({
+        t: `${name}: ${this._fmt(this.bookmarks.get(name))}`, c: '',
+      }));
+      if (!lines.length) lines.push({ t: '(no bookmarks)', c: 'dim' });
+      return { op: null, lines };
+    }
+    if (sub === 'create' || sub === 'set' || sub === 'c' || sub === 's') {
+      const create = sub === 'create' || sub === 'c';
+      const name = pos[0];
+      if (!name) throw new JJError(`jj bookmark ${sub} needs a name`);
+      if (!nameOk(name)) throw new JJError(`Invalid bookmark name "${name}"`);
+      if (create && this.bookmarks.has(name)) {
+        throw new JJError(`Bookmark already exists: ${name}`, `Use "jj bookmark set ${name} -r <rev>" to move it.`);
+      }
+      const rev = flags.r ? this.resolve(flags.r) : this.wc;
+      if (rev === ROOT_ID) throw new JJError('Cannot point a bookmark at the root commit');
+      const existed = this.bookmarks.has(name);
+      this.bookmarks.set(name, rev);
+      return {
+        op: `${existed ? 'move' : 'create'} bookmark ${name}`,
+        lines: [{ t: `${existed ? 'Moved' : 'Created'} 1 bookmarks ${existed ? 'to' : 'pointing to'} ${this._fmt(rev)}`, c: 'ok' }],
+      };
+    }
+    if (sub === 'move' || sub === 'm') {
+      const name = pos[0];
+      if (!name || !this.bookmarks.has(name)) throw new JJError(`No such bookmark: ${name || '(none given)'}`);
+      if (!flags.to) throw new JJError('jj bookmark move needs --to <rev>');
+      const rev = this.resolve(flags.to);
+      if (rev === ROOT_ID) throw new JJError('Cannot point a bookmark at the root commit');
+      this.bookmarks.set(name, rev);
+      return { op: `move bookmark ${name}`, lines: [{ t: `Moved 1 bookmarks to ${this._fmt(rev)}`, c: 'ok' }] };
+    }
+    if (sub === 'delete' || sub === 'd') {
+      const name = pos[0];
+      if (!name || !this.bookmarks.has(name)) throw new JJError(`No such bookmark: ${name || '(none given)'}`);
+      this.bookmarks.delete(name);
+      return { op: `delete bookmark ${name}`, lines: [{ t: `Deleted 1 bookmarks.`, c: 'ok' }] };
+    }
+    throw new JJError(`Unknown bookmark subcommand "${sub}"`, 'Supported: create, set, move, delete, list.');
+  }
+
+  _cmdDuplicate(args) {
+    const { pos } = parseArgs(args, {});
+    const rev = pos.length ? this.resolve(pos[0]) : this.wc;
+    this._checkRewritable(rev);
+    const rc = this.get(rev);
+    const node = this._createChange(rc.parents, rc.desc, rc.files);
+    return {
+      op: `duplicate commit ${this.short(rev)}`,
+      lines: [{ t: `Duplicated ${this.short(rev)} as ${this.short(node.id)} ${this._descOf(node)}`, c: 'ok' }],
+    };
+  }
+
+  /* ---------- files: shell-style commands operating on @ ---------- */
+
+  _fmtVal(v) {
+    if (!isConflict(v)) return v;
+    const c = v.conflict;
+    return `<<<<<<< side #1\n${c.sides[0] ?? '(absent)'}\n||||||| base\n${c.base ?? '(absent)'}\n=======\n${c.sides[1] ?? '(absent)'}\n>>>>>>> side #2`;
+  }
+
+  _shEcho(args) {
+    const sep = args.findIndex(a => a === '>' || a === '>>');
+    if (sep < 0 || sep === args.length - 1) {
+      throw new JJError('Usage: echo <content> > <file>', 'Writes the file in your working copy — jj snapshots it into @ automatically.');
+    }
+    const append = args[sep] === '>>';
+    const file = args[sep + 1];
+    let value = args.slice(0, sep).join(' ');
+    this._checkRewritable(this.wc);
+    const base = this._baseTreeOf(this.wc, null);
+    let from = base[file] ?? null;
+    if (isConflict(from)) from = from.conflict.base;
+    if (append) {
+      const trees = this.computeTrees();
+      const cur = trees.get(this.wc)[file];
+      if (cur && !isConflict(cur)) value = cur + ' ' + value;
+    }
+    this.get(this.wc).files[file] = { from, to: value };
+    this._touch(this.descendantsOf(this.wc, true));
+    return {
+      op: 'snapshot working copy',
+      lines: [{ t: `Wrote ${file}. jj noticed and snapshotted it into @ (${this.short(this.wc)}) — no add, no staging.`, c: 'ok' }],
+    };
+  }
+
+  _shRm(args) {
+    const file = args[0];
+    if (!file) throw new JJError('Usage: rm <file>');
+    this._checkRewritable(this.wc);
+    const trees = this.computeTrees();
+    const tree = trees.get(this.wc);
+    if (!(file in tree)) throw new JJError(`No such file in @: ${file}`);
+    const c = this.get(this.wc);
+    const base = this._baseTreeOf(this.wc, null);
+    const baseVal = base[file] ?? null;
+    if (baseVal === null) delete c.files[file];       // existed only via @'s own edit
+    else c.files[file] = { from: isConflict(baseVal) ? baseVal.conflict.base : baseVal, to: null };
+    this._touch(this.descendantsOf(this.wc, true));
+    return { op: 'snapshot working copy', lines: [{ t: `Deleted ${file}; @ (${this.short(this.wc)}) now records the removal.`, c: 'ok' }] };
+  }
+
+  _shCat(args) {
+    const file = args[0];
+    if (!file) throw new JJError('Usage: cat <file>');
+    const tree = this.computeTrees().get(this.wc);
+    if (!(file in tree)) throw new JJError(`No such file in @: ${file}`);
+    const v = tree[file];
+    const lines = this._fmtVal(v).split('\n').map(t => ({ t, c: isConflict(v) ? 'err' : '' }));
+    return { op: null, lines };
+  }
+
+  _shLs() {
+    const tree = this.computeTrees().get(this.wc);
+    const names = Object.keys(tree).sort();
+    if (!names.length) return { op: null, lines: [{ t: '(no files at @)', c: 'dim' }] };
+    return { op: null, lines: names.map(f => ({ t: `${f}${isConflict(tree[f]) ? '   ← conflict' : ''}`, c: isConflict(tree[f]) ? 'err' : '' })) };
+  }
+
+  _cmdFile(args) {
+    const sub = args[0];
+    if (sub === 'list' || !sub) return this._shLs();
+    if (sub === 'untrack') {
+      const file = args[1];
+      if (!file) throw new JJError('Usage: jj file untrack <file>');
+      this._checkRewritable(this.wc);
+      const tree = this.computeTrees().get(this.wc);
+      if (!(file in tree)) throw new JJError(`No such file in @: ${file}`);
+      const gi = tree['.gitignore'];
+      const patterns = gi && !isConflict(gi) ? gi.split(/\s+/) : [];
+      if (!patterns.includes(file)) {
+        throw new JJError(`'${file}' is not ignored, so jj would immediately snapshot it right back`,
+          `Add it to .gitignore first: echo ${file} > .gitignore (or >> to append). Same rule as real jj.`);
+      }
+      const c = this.get(this.wc);
+      const base = this._baseTreeOf(this.wc, null);
+      const baseVal = base[file] ?? null;
+      if (baseVal === null) delete c.files[file];
+      else c.files[file] = { from: isConflict(baseVal) ? baseVal.conflict.base : baseVal, to: null };
+      this._touch(this.descendantsOf(this.wc, true));
+      return { op: `untrack ${file}`, lines: [
+        { t: `Stopped tracking ${file} — removed from @'s snapshot.`, c: 'ok' },
+        { t: '(the file still exists on disk; it is now ignored, like git rm --cached)', c: 'dim' },
+      ] };
+    }
+    throw new JJError(`Unknown file subcommand "${sub}"`, 'Supported: jj file list, jj file untrack <file>.');
+  }
+
+  _cmdResolve() {
+    return { op: null, lines: [
+      { t: 'In this playground you resolve a conflict by writing the file while @ is on (or on top of) the conflicted change:', c: 'dim' },
+      { t: '    echo <the content you want> > <file>', c: 'cmd2' },
+      { t: 'Descendants recompute automatically once the conflict is gone.', c: 'dim' },
+    ] };
+  }
+
+  /* ---------- remote: a simulated GitHub/GitLab "origin" ---------- */
+
+  _cmdGit(args) {
+    const sub = args[0];
+    if (sub === 'push') return this._gitPush(args.slice(1));
+    if (sub === 'fetch') return this._gitFetch();
+    if (sub === 'init' || sub === 'clone') {
+      return { op: null, lines: [{ t: 'This playground repo is already git-backed and has an "origin" remote.', c: 'dim' }] };
+    }
+    throw new JJError(`Unknown git subcommand "${sub}"`, 'Supported: jj git push [--allow-new] [-b name], jj git fetch.');
+  }
+
+  _gitPush(rest) {
+    const { flags } = parseArgs(rest, {
+      b: { value: true, multi: true, aliases: ['bookmark'] },
+      'allow-new': {}, 'allow-empty-description': {},
+    });
+    let names = flags.b || [...this.bookmarks.keys()];
+    if (flags.b) {
+      for (const n of names) if (!this.bookmarks.has(n)) throw new JJError(`No such bookmark: ${n}`);
+    }
+    const trees = this.computeTrees();
+    const changed = [];
+    for (const name of names) {
+      const target = this.bookmarks.get(name);
+      const cur = this.remote.get(name);
+      if (cur && cur.id === target && cur.commitId === this.get(target).commitId) continue;
+      if (!cur && !flags['allow-new']) {
+        throw new JJError(`Refusing to create new remote bookmark ${name}@origin`,
+          `Pass --allow-new to create the branch on origin (real jj safety flag): jj git push --allow-new -b ${name}`);
+      }
+      // Validate the commits that would land on origin.
+      for (const id of this.ancestorsOf(target, true)) {
+        if (id === ROOT_ID) continue;
+        const c = this.get(id);
+        if (Object.values(trees.get(id) || {}).some(isConflict)) {
+          throw new JJError(`Won't push commit ${c.commitId.slice(0, 8)} since it has conflicts`, 'Resolve the conflict first — origin should never see conflict markers.');
+        }
+        if (!c.desc && !flags['allow-empty-description']) {
+          throw new JJError(`Won't push commit ${c.commitId.slice(0, 8)} since it has no description`, 'jj describe it first — every commit on origin needs a message.');
+        }
+      }
+      changed.push(name);
+    }
+    if (!changed.length) return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
+    const lines = [{ t: 'Changes to push to origin:', c: 'ok' }];
+    for (const name of changed) {
+      const target = this.bookmarks.get(name);
+      const cur = this.remote.get(name);
+      lines.push({
+        t: cur
+          ? `  Move ${name} from ${cur.commitId.slice(0, 8)} to ${this.get(target).commitId.slice(0, 8)}`
+          : `  Add ${name} → ${this.get(target).commitId.slice(0, 8)} (new branch on origin)`,
+        c: '',
+      });
+      this.remote.set(name, { id: target, commitId: this.get(target).commitId });
+    }
+    const trunk = this._trunkName();
+    if (trunk && changed.includes(trunk)) {
+      lines.push({ t: `Commits reachable from ${trunk}@origin are now immutable (◆) — shared history is protected.`, c: 'dim' });
+    }
+    return { op: `push bookmarks ${changed.join(', ')} to origin`, lines };
+  }
+
+  _gitFetch() {
+    if (this.fetchCount >= this.remoteScript.length) {
+      return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
+    }
+    const batch = this.remoteScript[this.fetchCount];
+    this.fetchCount++;
+    const lines = [];
+    for (const ev of batch) {
+      const cur = this.remote.get(ev.on);
+      const parentId = cur ? cur.id : this.bookmarks.get(ev.on);
+      if (!parentId) throw new JJError(`Remote has no branch "${ev.on}" to update`);
+      const trees = this.computeTrees();
+      const ptree = trees.get(parentId) || {};
+      const files = {};
+      for (const [f, v] of Object.entries(ev.files || {})) {
+        let from = ptree[f] ?? null;
+        if (isConflict(from)) from = from.conflict.base;
+        files[f] = { from, to: v };
+      }
+      const node = this._createChange([parentId], ev.desc, files);
+      const oldRemoteId = cur ? cur.id : null;
+      this.remote.set(ev.on, { id: node.id, commitId: node.commitId });
+      lines.push({ t: `bookmark: ${ev.on}@origin [updated] — new commit ${this.short(node.id)} "${ev.desc}"`, c: 'ok' });
+      if (this.bookmarks.get(ev.on) === oldRemoteId || this.bookmarks.get(ev.on) === parentId) {
+        this.bookmarks.set(ev.on, node.id);
+        lines.push({ t: `  (local bookmark ${ev.on} tracked the update and moved too)`, c: 'dim' });
+      }
+    }
+    return { op: 'fetch from origin', lines };
+  }
+
+  _cmdRevert(args) {
+    const { flags } = parseArgs(args, {
+      r: { value: true, aliases: ['revision'] },
+      d: { value: true, aliases: ['destination'] },
+    });
+    if (!flags.r) throw new JJError('jj revert needs -r <rev> (the commit to invert)');
+    const rev = this.resolve(flags.r);
+    if (rev === ROOT_ID) throw new JJError('Cannot revert the root commit');
+    const dest = flags.d ? this.resolve(flags.d) : this.wc;
+    const rc = this.get(rev);
+    const files = {};
+    for (const [f, p] of Object.entries(rc.files)) files[f] = { from: p.to ?? null, to: p.from ?? null };
+    const node = this._createChange([dest], `Revert "${rc.desc || this.short(rev)}"`, files);
+    return {
+      op: `revert commit ${this.short(rev)}`,
+      lines: [
+        { t: `Created ${this.short(node.id)} on ${this.short(dest)}: inverse of ${this.short(rev)} "${rc.desc}"`, c: 'ok' },
+        { t: '(revert adds an inverse commit — the original stays in history)', c: 'dim' },
+      ],
+    };
+  }
+
+  _cmdUndo() {
+    const base = this.undoCursor === null ? this.ops.length - 1 : this.undoCursor;
+    const targetIdx = base - 1;
+    if (targetIdx < 0) throw new JJError('Nothing to undo (already at the initial operation)');
+    const undone = this.ops[base];
+    this._restore(this.ops[targetIdx].snap);
+    this.undoCursor = targetIdx;
+    return {
+      op: `undo operation: ${undone.desc}`,
+      keepUndoCursor: true,
+      lines: [{ t: `Undid operation: ${undone.desc}`, c: 'ok' }, ...this._wcLines()],
+    };
+  }
+
+  _cmdOp(args) {
+    const sub = args[0];
+    if (sub === 'log' || !sub) {
+      const lines = [];
+      for (let i = this.ops.length - 1; i >= 0; i--) {
+        const o = this.ops[i];
+        lines.push({ t: `${i === this.ops.length - 1 ? '@ ' : '○ '}${o.id}  ${o.desc}`, c: i === this.ops.length - 1 ? 'ok' : '' });
+      }
+      return { op: null, lines };
+    }
+    if (sub === 'restore') {
+      const prefix = args[1];
+      if (!prefix) throw new JJError('jj op restore needs an operation ID (see jj op log)');
+      const hits = this.ops.filter(o => o.id.startsWith(prefix));
+      if (!hits.length) throw new JJError(`No operation matching "${prefix}"`);
+      if (hits.length > 1) throw new JJError(`Operation ID prefix "${prefix}" is ambiguous`);
+      this._restore(hits[0].snap);
+      return { op: `restore to operation ${hits[0].id.slice(0, 8)}`, lines: [{ t: `Restored to operation ${hits[0].id}`, c: 'ok' }, ...this._wcLines()] };
+    }
+    throw new JJError(`Unknown op subcommand "${sub}"`, 'Supported: jj op log, jj op restore <id>.');
+  }
+
+  _cmdLog() {
+    const row = this._rows();
+    const idx = new Map([...this.changes.keys()].map((id, i) => [id, i]));
+    const nodes = [...this.changes.values()].sort((a, b) => (row[b.id] - row[a.id]) || (idx.get(b.id) - idx.get(a.id)));
+    const immutable = this._immutableIds();
+    const conflicted = this._conflictedIds();
+    const lines = nodes.map(c => {
+      const sym = conflicted.has(c.id) ? '×' : c.id === this.wc ? '@' : (immutable.has(c.id) ? '◆' : '○');
+      const bks = [
+        ...this.bookmarksAt(c.id),
+        ...this.remoteBookmarksAt(c.id).map(n => n + '@origin'),
+      ];
+      const bk = bks.length ? ' ' + bks.join(' ') : '';
+      const flag = conflicted.has(c.id) ? ' (conflict)' : '';
+      return {
+        t: `${sym}  ${this.short(c.id)} ${c.commitId.slice(0, 8)}${bk} ${c.id === ROOT_ID ? 'root()' : this._descOf(c)}${flag}`,
+        c: conflicted.has(c.id) ? 'err' : c.id === this.wc ? 'ok' : '',
+      };
+    });
+    return { op: null, lines };
+  }
+
+  _cmdStatus() {
+    const c = this.get(this.wc);
+    const lines = [];
+    const entries = Object.entries(c.files);
+    if (!entries.length) lines.push({ t: 'The working copy has no changes.', c: 'dim' });
+    else {
+      lines.push({ t: 'Working copy changes:', c: '' });
+      for (const [f, p] of entries) {
+        const kind = (p.from ?? null) === null ? 'A' : (p.to ?? null) === null ? 'D' : 'M';
+        lines.push({ t: `  ${kind} ${f}`, c: kind === 'D' ? 'err' : 'ok' });
+      }
+    }
+    const tree = this.computeTrees().get(this.wc);
+    const conflicted = Object.keys(tree).filter(f => isConflict(tree[f]));
+    if (conflicted.length) {
+      lines.push({ t: 'There are unresolved conflicts at these paths:', c: 'err' });
+      conflicted.forEach(f => lines.push({ t: `  ${f}    (write the file to resolve: echo <content> > ${f})`, c: 'err' }));
+    }
+    lines.push({ t: `Working copy  (@) : ${this._fmt(this.wc)}`, c: 'ok' });
+    lines.push(...c.parents.map(p => ({ t: `Parent commit (@-): ${this._fmt(p)}`, c: 'dim' })));
+    return { op: null, lines };
+  }
+
+  /* ---------- state for rendering / comparison ---------- */
+
+  getState() {
+    const bookmarks = {};
+    for (const [name, target] of this.bookmarks) bookmarks[name] = target;
+    const remoteBookmarks = {};
+    for (const [name, ref] of this.remote) {
+      if (!this.changes.has(ref.id)) continue;
+      remoteBookmarks[name] = { id: ref.id, stale: this.get(ref.id).commitId !== ref.commitId };
+    }
+    const trees = this.computeTrees();
+    const immutable = this._immutableIds();
+    return {
+      changes: [...this.changes.values()].map(c => {
+        const tree = trees.get(c.id) || {};
+        const treeView = {};
+        for (const [f, v] of Object.entries(tree)) treeView[f] = isConflict(v) ? '!conflict' : v;
+        return {
+          ...c,
+          parents: c.parents.slice(),
+          files: JSON.parse(JSON.stringify(c.files)),
+          tree: treeView,
+          conflicted: Object.values(tree).some(isConflict),
+          immutable: immutable.has(c.id),
+          hasFiles: Object.keys(c.files).length > 0,
+        };
+      }),
+      wc: this.wc,
+      bookmarks,
+      remoteBookmarks,
+    };
+  }
+}
+
+/* Structural comparison: reduce a state to its "significant" nodes (root,
+ * described changes, bookmark targets, and — optionally — @), each keyed by
+ * description, with edges to the nearest significant ancestors. Change and
+ * commit IDs are ignored, matching jj's philosophy that IDs are incidental. */
+function analyzeState(state, opts = {}) {
+  const checkWC = opts.checkWC !== false;
+  const byId = new Map(state.changes.map(c => [c.id, c]));
+  const bkAt = {};
+  for (const [name, target] of Object.entries(state.bookmarks)) (bkAt[target] = bkAt[target] || []).push(name);
+  for (const k of Object.keys(bkAt)) bkAt[k].sort();
+  const rbAt = {};
+  for (const [name, ref] of Object.entries(state.remoteBookmarks || {})) {
+    (rbAt[ref.id] = rbAt[ref.id] || []).push({ name, stale: !!ref.stale });
+  }
+  for (const k of Object.keys(rbAt)) rbAt[k].sort((a, b) => a.name.localeCompare(b.name));
+
+  const isSig = id => {
+    const c = byId.get(id);
+    if (!c) return false;
+    return c.id === ROOT_ID || !!c.desc || !!bkAt[id] || !!rbAt[id] || (checkWC && id === state.wc);
+  };
+  const keyOf = id => {
+    const c = byId.get(id);
+    if (c.id === ROOT_ID) return 'ROOT';
+    if (c.desc) return 'D:' + c.desc;
+    if (bkAt[id]) return 'B:' + bkAt[id].join(',');
+    if (rbAt[id]) return 'R:' + rbAt[id].map(r => r.name).join(',');
+    return '@';
+  };
+  const sigAncestors = id => {
+    const out = new Set(); const seen = new Set();
+    const walk = pid => {
+      if (seen.has(pid)) return;
+      seen.add(pid);
+      if (isSig(pid)) { out.add(keyOf(pid)); return; }
+      const c = byId.get(pid);
+      if (c) c.parents.forEach(walk);
+    };
+    byId.get(id).parents.forEach(walk);
+    return [...out].sort();
+  };
+
+  const nodes = [];
+  for (const c of state.changes) {
+    if (!isSig(c.id)) continue;
+    const tree = {};
+    for (const [f, v] of Object.entries(c.tree || {})) tree[f] = v === '!conflict' ? '!' : v;
+    nodes.push({
+      id: c.id,
+      key: keyOf(c.id),
+      parents: sigAncestors(c.id),
+      bookmarks: (bkAt[c.id] || []),
+      rbk: (rbAt[c.id] || []),
+      tree,
+      conflicted: !!c.conflicted,
+      wc: c.id === state.wc,
+    });
+  }
+  return { nodes, checkWC };
+}
+
+function canonState(state, opts = {}) {
+  const { nodes, checkWC } = analyzeState(state, opts);
+  return nodes.map(n => {
+    const parts = [
+      n.key,
+      'p=' + n.parents.join('|'),
+      'bk=' + n.bookmarks.join(','),
+      'rbk=' + n.rbk.map(r => r.name + (r.stale ? '~' : '')).join(','),
+      'tree=' + JSON.stringify(Object.entries(n.tree).sort((a, b) => a[0].localeCompare(b[0]))),
+    ];
+    if (checkWC) parts.push('wc=' + (n.wc ? 1 : 0));
+    return parts.join(' ; ');
+  }).sort().join('\n');
+}
+
+/* Human-readable differences between a player's state and the goal state.
+ * Returns an array of plain-English messages; empty means they match. */
+function diffStates(userState, goalState, opts = {}) {
+  const U = analyzeState(userState, opts).nodes;
+  const G = analyzeState(goalState, opts).nodes;
+  const checkWC = opts.checkWC !== false;
+  const friendly = k =>
+    k === 'ROOT' ? 'root'
+    : k === '@' ? 'an empty, undescribed change'
+    : k.startsWith('D:') ? `"${k.slice(2)}"`
+    : `the change holding bookmark "${k.slice(2)}"`;
+  const plist = ps => ps.length ? ps.map(friendly).join(' + ') : '(nothing)';
+  const group = arr => {
+    const m = new Map();
+    for (const n of arr) { if (!m.has(n.key)) m.set(n.key, []); m.get(n.key).push(n); }
+    return m;
+  };
+  const uBy = group(U), gBy = group(G);
+  const msgs = [];
+
+  for (const [key, gs] of gBy) {
+    const us = uBy.get(key) || [];
+    if (!us.length) {
+      msgs.push(key === '@'
+        ? `The goal ends on a fresh empty change (@) on top of ${plist(gs[0].parents)} — finish with jj new.`
+        : `Your graph is missing a change described ${friendly(key)} on top of ${plist(gs[0].parents)}.`);
+      continue;
+    }
+    if (us.length !== gs.length) {
+      msgs.push(`You have ${us.length} changes matching ${friendly(key)}; the goal has ${gs.length}.`);
+      continue;
+    }
+    if (us[0].parents.join('|') !== gs[0].parents.join('|')) {
+      msgs.push(`${friendly(key)} sits on ${plist(us[0].parents)}, but the goal wants it on ${plist(gs[0].parents)}.`);
+    }
+    // File-tree differences at this node.
+    const uf = us[0].tree || {}, gf = gs[0].tree || {};
+    for (const f of new Set([...Object.keys(uf), ...Object.keys(gf)])) {
+      const uv = uf[f], gv = gf[f];
+      if (uv === gv) continue;
+      if (uv === '!') msgs.push(`"${f}" in ${friendly(key)} has an unresolved conflict — resolve it by writing the file (echo <content> > ${f}).`);
+      else if (gv === undefined) msgs.push(`${friendly(key)} shouldn't contain "${f}" — remove it (rm ${f}) or fix the commit that adds it.`);
+      else if (uv === undefined) msgs.push(`${friendly(key)} should contain "${f}" = "${gv}".`);
+      else msgs.push(`"${f}" in ${friendly(key)} contains "${uv}", but the goal wants "${gv}".`);
+    }
+  }
+  for (const [key, us] of uBy) {
+    if (gBy.has(key)) continue;
+    msgs.push(key === '@'
+      ? `@ is on an extra empty change (on top of ${plist(us[0].parents)}) that the goal doesn't have — jj undo, or jj edit the change @ should be on.`
+      : `You have an extra change ${friendly(key)} that isn't in the goal — jj abandon it, or jj undo.`);
+  }
+  if (checkWC) {
+    const uk = (U.find(n => n.wc) || {}).key || null;
+    const gk = (G.find(n => n.wc) || {}).key || null;
+    if (uk !== gk && gk) {
+      msgs.push(`@ should end up on ${gk === '@' ? 'the fresh empty change on top' : friendly(gk)}` +
+        (uk ? `, but yours is on ${friendly(uk)}.` : '.'));
+    }
+  }
+  const bmap = nodes => {
+    const m = new Map();
+    for (const n of nodes) for (const b of n.bookmarks) m.set(b, n.key);
+    return m;
+  };
+  const ub = bmap(U), gb = bmap(G);
+  for (const [name, key] of gb) {
+    if (!ub.has(name)) msgs.push(`Missing bookmark "${name}" — the goal has it on ${friendly(key)}.`);
+    else if (ub.get(name) !== key) msgs.push(`Bookmark "${name}" points at ${friendly(ub.get(name))}, but the goal wants it on ${friendly(key)}.`);
+  }
+  for (const name of ub.keys()) {
+    if (!gb.has(name)) msgs.push(`You have a bookmark "${name}" that isn't in the goal — jj bookmark delete ${name}.`);
+  }
+  // Remote bookmarks (origin branches).
+  const rmap = nodes => {
+    const m = new Map();
+    for (const n of nodes) for (const r of n.rbk) m.set(r.name, { key: n.key, stale: r.stale });
+    return m;
+  };
+  const ur = rmap(U), gr = rmap(G);
+  for (const [name, g] of gr) {
+    const u = ur.get(name);
+    if (!u) msgs.push(`origin has no branch "${name}" yet — the goal wants ${name}@origin on ${friendly(g.key)} (jj git push --allow-new).`);
+    else if (u.key !== g.key) msgs.push(`${name}@origin points at ${friendly(u.key)}, but the goal wants it on ${friendly(g.key)} — jj git push after moving the bookmark.`);
+    else if (u.stale && !g.stale) msgs.push(`${name}@origin is stale — you rewrote the commit locally but haven't pushed (jj git push).`);
+  }
+  for (const name of ur.keys()) {
+    if (!gr.has(name)) msgs.push(`origin has a branch "${name}" that isn't in the goal.`);
+  }
+  return msgs;
+}
+
+const JJ = { JJEngine, JJError, tokenize, canonState, analyzeState, diffStates, ROOT_ID };
+if (typeof module !== 'undefined' && module.exports) module.exports = JJ;
+else global.JJ = JJ;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+/*
+ * graph.js — SVG renderer for the jj change graph, with tweened transitions.
+ * Root sits at the bottom; children stack upward (like jj log, newest on top).
+ */
+(function (global) {
+'use strict';
+
+const COL_GAP = 108;
+const ROW_GAP = 92;
+const R = 20;
+const SVGNS = 'http://www.w3.org/2000/svg';
+
+const stores = new WeakMap();
+
+function layout(state) {
+  const nodes = state.changes;
+  const byId = new Map(nodes.map(c => [c.id, c]));
+  const idx = new Map(nodes.map((c, i) => [c.id, i]));
+  const children = new Map(nodes.map(c => [c.id, []]));
+  for (const c of nodes) for (const p of c.parents) if (children.has(p)) children.get(p).push(c.id);
+
+  // Rows: longest path from a root, via Kahn's algorithm.
+  const row = new Map(); const indeg = new Map(); const queue = [];
+  for (const c of nodes) {
+    indeg.set(c.id, c.parents.filter(p => byId.has(p)).length);
+    if (!indeg.get(c.id)) { row.set(c.id, 0); queue.push(c.id); }
+  }
+  while (queue.length) {
+    const cur = queue.shift();
+    for (const kid of children.get(cur)) {
+      row.set(kid, Math.max(row.get(kid) || 0, row.get(cur) + 1));
+      indeg.set(kid, indeg.get(kid) - 1);
+      if (!indeg.get(kid)) queue.push(kid);
+    }
+  }
+
+  // Columns: a chain keeps its first parent's column; siblings shift right.
+  const order = [...nodes].sort((a, b) => (row.get(a.id) - row.get(b.id)) || (idx.get(a.id) - idx.get(b.id)));
+  const col = new Map(); const occupied = new Set();
+  for (const n of order) {
+    const firstParent = n.parents.find(p => col.has(p));
+    let c = firstParent !== undefined ? col.get(firstParent) : 0;
+    while (occupied.has(c + ':' + row.get(n.id))) c++;
+    col.set(n.id, c);
+    occupied.add(c + ':' + row.get(n.id));
+  }
+
+  const pos = new Map();
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const n of nodes) {
+    const x = col.get(n.id) * COL_GAP;
+    const y = -row.get(n.id) * ROW_GAP;
+    pos.set(n.id, { x, y });
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+  }
+  const padL = 70, padR = 130, padT = 55, padB = 55;
+  let vb = [minX - padL, minY - padT, (maxX - minX) + padL + padR, (maxY - minY) + padT + padB];
+  const minW = 340, minH = 260;
+  if (vb[2] < minW) { vb[0] -= (minW - vb[2]) / 2; vb[2] = minW; }
+  if (vb[3] < minH) { vb[1] -= (minH - vb[3]) / 2; vb[3] = minH; }
+  return { pos, vb };
+}
+
+function el(name, attrs, parent) {
+  const e = document.createElementNS(SVGNS, name);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function edgePath(a, b) {
+  // a = child (above, smaller y), b = parent (below).
+  const x1 = a.x, y1 = a.y + R, x2 = b.x, y2 = b.y - R;
+  if (Math.abs(x1 - x2) < 0.5) return `M ${x1} ${y1} L ${x2} ${y2}`;
+  const my = (y1 + y2) / 2;
+  return `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`;
+}
+
+function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+function buildNode(c, state, opts) {
+  const g = el('g', { class: 'node' });
+  const isWC = c.id === state.wc;
+  const isRoot = c.parents.length === 0;
+  const bks = Object.entries(state.bookmarks).filter(([, t]) => t === c.id).map(([n]) => n).sort();
+  const rbks = Object.entries(state.remoteBookmarks || {})
+    .filter(([, ref]) => ref.id === c.id)
+    .map(([n, ref]) => ({ name: n + '@origin', stale: ref.stale }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (isRoot) {
+    el('rect', { x: -15, y: -15, width: 30, height: 30, rx: 4, transform: 'rotate(45)', class: 'nodeRoot' }, g);
+    el('text', { y: 4, class: 'nodeDescText nodeRootText', 'text-anchor': 'middle' }, g).textContent = 'root';
+  } else {
+    if (isWC) el('circle', { r: R + 6, class: 'wcRing' }, g);
+    let cls = c.desc || c.hasFiles ? 'nodeCircle described' : 'nodeCircle empty';
+    if (c.conflicted) cls += ' conflicted';
+    if (c.immutable) cls += ' immutable';
+    el('circle', { r: R, class: cls }, g);
+    const files = Object.keys(c.files || {});
+    const raw = c.desc || (files.length ? files[0] : 'empty');
+    const label = el('text', { y: 4, class: c.desc ? 'nodeDescText' : 'nodeEmptyText', 'text-anchor': 'middle' }, g);
+    label.textContent = raw.length > 9 ? raw.slice(0, 8) + '…' : raw;
+    if (c.conflicted) {
+      const badge = el('g', { transform: `translate(${R - 4}, ${-R + 2})`, class: 'conflictBadge' }, g);
+      el('circle', { r: 9 }, badge);
+      el('text', { y: 4, 'text-anchor': 'middle' }, badge).textContent = '×';
+    }
+  }
+
+  if (!opts.hideIds) {
+    const idText = el('text', { y: R + 16, class: 'nodeId', 'text-anchor': 'middle' }, g);
+    if (c.immutable && !isRoot) {
+      const im = el('tspan', { class: 'immuMark' }, idText);
+      im.textContent = '◆ ';
+    }
+    const hi = el('tspan', { class: 'nodeIdHi' }, idText);
+    hi.textContent = c.id.slice(0, 2);
+    const lo = el('tspan', { class: 'nodeIdLo' }, idText);
+    lo.textContent = c.id.slice(2, 5);
+  }
+
+  if (isWC) {
+    const badge = el('g', { class: 'wcBadge', transform: `translate(${-R - 24}, ${-R - 2})` }, g);
+    el('rect', { x: -11, y: -11, width: 24, height: 22, rx: 6, class: 'wcBadgeBg' }, badge);
+    el('text', { y: 5, x: 1, 'text-anchor': 'middle', class: 'wcBadgeText' }, badge).textContent = '@';
+  }
+
+  let chipRow = 0;
+  bks.forEach(name => {
+    const chip = el('g', { transform: `translate(${R + 10}, ${-10 + chipRow++ * 21})`, class: 'bookmarkChip' }, g);
+    const w = 14 + name.length * 7.2;
+    el('rect', { x: 0, y: 0, width: w, height: 17, rx: 8 }, chip);
+    el('text', { x: w / 2, y: 12, 'text-anchor': 'middle' }, chip).textContent = name;
+  });
+  rbks.forEach(r => {
+    const chip = el('g', {
+      transform: `translate(${R + 10}, ${-10 + chipRow++ * 21})`,
+      class: 'remoteChip' + (r.stale ? ' stale' : ''),
+    }, g);
+    const label = r.name + (r.stale ? ' *' : '');
+    const w = 14 + label.length * 6.6;
+    el('rect', { x: 0, y: 0, width: w, height: 17, rx: 8 }, chip);
+    el('text', { x: w / 2, y: 12, 'text-anchor': 'middle' }, chip).textContent = label;
+  });
+
+  return g;
+}
+
+function render(svg, state, opts = {}) {
+  let store = stores.get(svg);
+  if (!store) { store = { pos: new Map(), vb: null, raf: null }; stores.set(svg, store); }
+  if (store.raf) cancelAnimationFrame(store.raf);
+
+  const { pos: target, vb: targetVb } = layout(state);
+  const first = store.pos.size === 0;
+  const startVb = store.vb || targetVb;
+
+  svg.innerHTML = '';
+  const gEdges = el('g', {}, svg);
+  const gNodes = el('g', {}, svg);
+
+  const edges = [];
+  for (const c of state.changes) {
+    for (const p of c.parents) {
+      if (!target.has(p)) continue;
+      edges.push({ from: c.id, to: p, elem: el('path', { class: 'edge' }, gEdges) });
+    }
+  }
+
+  const nodeEls = [];
+  for (const c of state.changes) {
+    const g = buildNode(c, state, opts);
+    gNodes.appendChild(g);
+    const to = target.get(c.id);
+    let from = store.pos.get(c.id);
+    let isNew = false;
+    if (!from) {
+      isNew = true;
+      const pWithPos = c.parents.find(p => store.pos.has(p));
+      from = pWithPos ? { ...store.pos.get(pWithPos) } : { ...to };
+    }
+    nodeEls.push({ id: c.id, g, from, to, isNew });
+  }
+
+  const dur = first ? 0 : 480;
+  const t0 = performance.now();
+  const cur = new Map();
+
+  const frame = now => {
+    const k = dur === 0 ? 1 : ease(Math.min(1, (now - t0) / dur));
+    for (const n of nodeEls) {
+      const x = n.from.x + (n.to.x - n.from.x) * k;
+      const y = n.from.y + (n.to.y - n.from.y) * k;
+      cur.set(n.id, { x, y });
+      n.g.setAttribute('transform', `translate(${x}, ${y})`);
+      if (n.isNew) n.g.setAttribute('opacity', String(0.15 + 0.85 * k));
+    }
+    for (const e of edges) e.elem.setAttribute('d', edgePath(cur.get(e.from), cur.get(e.to)));
+    const vb = startVb.map((v, i) => v + (targetVb[i] - v) * k);
+    svg.setAttribute('viewBox', vb.join(' '));
+    if (k < 1) store.raf = requestAnimationFrame(frame);
+    else { store.pos = new Map([...target]); store.vb = targetVb; store.raf = null; }
+  };
+  store.raf = requestAnimationFrame(frame);
+}
+
+function resetView(svg) { stores.delete(svg); }
+
+const GraphView = { render, resetView };
+if (typeof module !== 'undefined' && module.exports) module.exports = GraphView;
+else global.GraphView = GraphView;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+/*
+ * levels.js — level definitions.
+ *
+ * Each level replays `start` on a fresh, seeded engine, so the change IDs in
+ * the start state are deterministic (kk, kl, km, … in creation order) and can
+ * be referenced literally in solutions and hints. The goal state is derived by
+ * replaying start + solution, which guarantees every goal is reachable.
+ */
+(function (global) {
+'use strict';
+
+const SEQUENCES = [
+  { id: 'basics', title: 'The Basics', blurb: 'The working copy is a commit. Everything follows from that.' },
+  { id: 'bookmarks', title: 'Bookmarks', blurb: 'Like git branches, except they stay where you put them.' },
+  { id: 'rebase', title: 'Moving Work Around', blurb: 'Rebase subtrees, extract commits, merge — all without a checkout.' },
+  { id: 'power', title: 'Superpowers', blurb: 'The operation log, undo, and history surgery.' },
+  { id: 'files', title: 'Files & the Auto-Snapshot', blurb: 'No staging area, no untracked limbo — and how to keep secrets out.' },
+  { id: 'remotes', title: 'GitHub & GitLab', blurb: 'Bookmarks become branches: push, fetch, and the PR loop without force-push fear.' },
+  { id: 'conflicts', title: 'Conflicts Without Fear', blurb: 'Conflicts are recorded in commits, not emergencies that block you.' },
+  { id: 'oops', title: 'Oops: Secrets & History Surgery', blurb: 'Committed something you shouldn\'t have? Fix it at every stage.' },
+];
+
+const LEVELS = [
+  /* ------------------------------------------------ basics ---- */
+  {
+    id: 'basics-1', seq: 'basics', title: 'Hello, working copy',
+    cards: [
+      `<p><strong>Welcome!</strong> This is an interactive playground for
+       <a href="https://jj-vcs.github.io/jj/latest/" target="_blank" rel="noreferrer">Jujutsu (jj)</a>,
+       in the spirit of <em>Learn Git Branching</em>.</p>
+       <p>The single most important idea in jj: <strong>your working copy is itself a commit</strong>,
+       shown as <code>@</code> in the graph. There is no staging area and no "uncommitted changes" —
+       as you edit files, <code>@</code> automatically absorbs your work.</p>
+       <p class="cardNote">In this playground a change's <em>content</em> is abstracted away:
+       what matters is its <strong>description</strong> and its place in the graph.
+       Dashed circles are changes with no description yet.</p>`,
+      `<p>Two commands to start:</p>
+       <p><code>jj describe -m "message"</code> — give the current change a description.<br>
+       <code>jj new</code> — finish up and start a fresh, empty change on top of <code>@</code>.</p>
+       <p>Notice what's missing: no <code>git add</code>, no <code>git commit</code>, no stash.
+       Describing and moving on <em>is</em> the workflow.</p>
+       <p>Type commands in the terminal on the left. <code>jj log</code> and
+       <code>jj st</code> work too. Type <code>help</code> anytime.</p>`,
+    ],
+    objective: 'Describe the working copy as "A", then start a new empty change on top of it.',
+    hint: 'jj describe -m "A" names the current change; jj new starts the next one.',
+    start: [],
+    solution: ['jj describe -m "A"', 'jj new'],
+  },
+  {
+    id: 'basics-2', seq: 'basics', title: 'jj commit',
+    cards: [
+      `<p><code>jj commit -m "msg"</code> is simply <code>jj describe -m "msg"</code> +
+       <code>jj new</code> in one step: it names the current change and starts the next one.</p>
+       <p>Because the working copy is always a commit, "committing" in jj is just
+       <em>labelling work you already have</em> — nothing to stage, nothing to forget.</p>`,
+    ],
+    objective: 'Create two finished changes "A" and "B", ending on a fresh empty change on top.',
+    hint: 'Two commands: jj commit -m "A", then jj commit -m "B".',
+    start: [],
+    solution: ['jj commit -m "A"', 'jj commit -m "B"'],
+  },
+  {
+    id: 'basics-3', seq: 'basics', title: 'Branching without branches',
+    cards: [
+      `<p>In git, working "somewhere else" means creating a branch and checking it out.
+       In jj you just start a change wherever you want:</p>
+       <p><code>jj new &lt;revision&gt;</code> — begin a new change on top of <em>any</em> revision.</p>
+       <p>Revisions are addressed by their <strong>change ID</strong> — the letters under each node.
+       The first two letters (shown bright) are enough to identify a change.</p>`,
+      `<p>One more jj nicety you'll see in action here: if you move <code>@</code> away from a change
+       that is empty and undescribed, jj cleans it up automatically. No litter.</p>
+       <p class="cardNote">Heads up: the <b>@</b> badge in the Goal panel matters — finish with
+       <code>@</code> still on C. If you overshoot with an extra <code>jj new</code>, step back with
+       <code>jj undo</code>, or jump straight there with <code>jj edit</code>.</p>`,
+    ],
+    objective: 'Start a new change described "C" on top of A, leaving @ on C — making B and C siblings.',
+    hint: 'Read A\'s change ID from the graph: jj new kk -m "C"',
+    start: ['jj commit -m "A"', 'jj commit -m "B"'],
+    solution: ['jj new kk -m "C"'],
+  },
+  {
+    id: 'basics-4', seq: 'basics', title: 'Squash',
+    cards: [
+      `<p><code>jj squash</code> folds a change into its parent — it's jj's
+       <code>commit --amend</code>, generalized.</p>
+       <p>Plain <code>jj squash</code> folds <code>@</code> into its parent.
+       <code>jj squash -r &lt;rev&gt;</code> folds <em>any</em> revision into its parent —
+       and every descendant is <strong>rebased automatically</strong>. You never
+       "check out" anything to amend it.</p>`,
+    ],
+    objective: 'Fold B into its parent A, leaving the chain A ← C.',
+    hint: 'jj squash -r kl (kl is B\'s change ID).',
+    start: ['jj commit -m "A"', 'jj commit -m "B"', 'jj commit -m "C"'],
+    solution: ['jj squash -r kl'],
+  },
+  {
+    id: 'basics-5', seq: 'basics', title: 'Abandon ship',
+    cards: [
+      `<p><code>jj abandon &lt;rev&gt;</code> removes a change from history.</p>
+       <p>Here's the magic: its children are <strong>automatically rebased onto its parents</strong>.
+       Nothing is orphaned, there's no detached HEAD, no reflog spelunking.
+       Watch B heal onto A the moment the experiment disappears.</p>`,
+    ],
+    objective: 'Abandon the "experiment" change. B should end up directly on A.',
+    hint: 'jj abandon kl — then watch the auto-rebase.',
+    start: ['jj commit -m "A"', 'jj commit -m "experiment"', 'jj commit -m "B"'],
+    solution: ['jj abandon kl'],
+  },
+
+  /* --------------------------------------------- bookmarks ---- */
+  {
+    id: 'bookmarks-1', seq: 'bookmarks', title: 'Name a spot',
+    cards: [
+      `<p>jj has no "current branch". Named pointers are called <strong>bookmarks</strong>:
+       like git branches, they mark a revision — but you are never "on" one.</p>
+       <p><code>jj bookmark create &lt;name&gt; -r &lt;rev&gt;</code> creates one.
+       <code>jj bookmark list</code> shows them. Mostly you need bookmarks to talk to
+       git remotes; day-to-day jj work runs happily on change IDs alone.</p>`,
+    ],
+    objective: 'Create a bookmark "main" pointing at B.',
+    hint: 'jj bookmark create main -r kl',
+    start: ['jj commit -m "A"', 'jj commit -m "B"'],
+    solution: ['jj bookmark create main -r kl'],
+  },
+  {
+    id: 'bookmarks-2', seq: 'bookmarks', title: 'Bookmarks stay put',
+    cards: [
+      `<p>The big mindset shift from git: committing does <strong>not</strong> move any bookmark.
+       In git, your branch follows you around; in jj, bookmarks stay where you put them
+       until you move them explicitly:</p>
+       <p><code>jj bookmark set &lt;name&gt; -r &lt;rev&gt;</code></p>
+       <p>The revset <code>@-</code> means "the parent of <code>@</code>" — perfect right after
+       finishing a change, when <code>@</code> is a fresh empty commit on top of your work.</p>`,
+    ],
+    objective: 'Create a change "C" on top of B, then move main to point at it.',
+    hint: 'jj commit -m "C", then jj bookmark set main -r @-',
+    start: ['jj commit -m "A"', 'jj commit -m "B"', 'jj bookmark set main -r @-'],
+    solution: ['jj commit -m "C"', 'jj bookmark set main -r @-'],
+  },
+
+  /* ------------------------------------------------ rebase ---- */
+  {
+    id: 'rebase-1', seq: 'rebase', title: 'Rebase a stack',
+    cards: [
+      `<p>Rebasing is where jj shines. One command moves whole subtrees:</p>
+       <p><code>jj rebase -s &lt;rev&gt; -d &lt;dest&gt;</code> — move <em>rev and all its
+       descendants</em> onto dest.</p>
+       <p>Compare with git: no checkout first, no "rebase in progress" state, no
+       stopping halfway. Even conflicts wouldn't stop it — jj records them
+       <em>inside</em> commits to resolve whenever you like (a story for another day).
+       And <code>@</code>? It just rides along with the moved commits.</p>`,
+    ],
+    objective: 'Rebase the feature stack (C and its child D) onto main.',
+    hint: 'jj rebase -s kn -d main (kn is C). Also try -b @ -d main — same result here.',
+    start: [
+      'jj commit -m "A"', 'jj commit -m "B"', 'jj bookmark set main -r @-',
+      'jj new kk -m "C"', 'jj new -m "D"', 'jj bookmark create feat -r @',
+    ],
+    solution: ['jj rebase -s kn -d main'],
+  },
+  {
+    id: 'rebase-2', seq: 'rebase', title: 'Extract a commit',
+    cards: [
+      `<p><code>jj rebase -r &lt;rev&gt; -d &lt;dest&gt;</code> moves <em>exactly one</em> revision.</p>
+       <p>Its children are automatically grafted onto its parents — so <code>-r</code> lets you
+       <strong>pluck a commit out of the middle of a stack</strong> and drop it anywhere,
+       while the stack heals itself behind it. In git this is an interactive rebase
+       with a plan file; in jj it's one flag.</p>`,
+    ],
+    objective: 'B is a debug commit stuck mid-stack. Move it on top of D; C should heal onto A.',
+    hint: 'jj rebase -r kl -d kn (kl is B, kn is D).',
+    start: ['jj commit -m "A"', 'jj commit -m "B"', 'jj commit -m "C"', 'jj commit -m "D"'],
+    solution: ['jj rebase -r kl -d kn'],
+  },
+  {
+    id: 'rebase-3', seq: 'rebase', title: 'Merges are just changes',
+    cards: [
+      `<p>There is no <code>jj merge</code>. To merge, create a change with more than one parent:</p>
+       <p><code>jj new &lt;rev1&gt; &lt;rev2&gt; -m "msg"</code></p>
+       <p>That's the whole feature. A merge commit isn't special — it's an ordinary change
+       that happens to have two parents. (Three or more work too, if you enjoy octopi.)</p>`,
+    ],
+    objective: 'Create a merge change "M" whose parents are B and C.',
+    hint: 'jj new kl kn -m "M"',
+    start: ['jj commit -m "A"', 'jj commit -m "B"', 'jj new kk -m "C"'],
+    solution: ['jj new kl kn -m "M"'],
+  },
+
+  /* ------------------------------------------------- power ---- */
+  {
+    id: 'power-1', seq: 'power', title: 'Undo. Yes, really.',
+    cards: [
+      `<p>Every jj command is recorded in the <strong>operation log</strong>. See it with
+       <code>jj op log</code>.</p>
+       <p><code>jj undo</code> reverses the most recent operation — <em>any</em> operation:
+       an abandon, a rebase, a bookmark move. Run it again and it steps further back.
+       This is repo-wide, effortless undo; git has nothing like it.</p>
+       <p>Uh oh — someone just abandoned B by mistake. The graph looks like B never
+       existed… but the op log remembers.</p>`,
+    ],
+    objective: 'B was abandoned by accident. Bring it back.',
+    hint: 'jj op log shows what happened; jj undo reverses it.',
+    start: ['jj commit -m "A"', 'jj commit -m "B"', 'jj abandon kl'],
+    solution: ['jj undo'],
+  },
+  {
+    id: 'power-2', seq: 'power', title: 'Insert a change',
+    cards: [
+      `<p>Need a commit <em>between</em> two existing ones? jj can insert directly:</p>
+       <p><code>jj new -B &lt;rev&gt; -m "msg"</code> — insert <em>before</em> rev
+       (<code>-A</code> inserts <em>after</em>).</p>
+       <p>Descendants are — you guessed it — rebased automatically. <code>@</code> moves
+       into the freshly inserted change so you can do the work.</p>`,
+    ],
+    objective: 'Insert a change "H" (a hotfix) between A and B.',
+    hint: 'jj new -B kl -m "H" (kl is B).',
+    start: ['jj commit -m "A"', 'jj commit -m "B"'],
+    solution: ['jj new -B kl -m "H"'],
+  },
+  {
+    id: 'power-3', seq: 'power', title: 'Grand finale',
+    cards: [
+      `<p>Time to put it all together. The repo is a mess:</p>
+       <ul><li><strong>X</strong> is junk that should be abandoned,</li>
+       <li>the <strong>C – D</strong> stack belongs on top of main (B),</li>
+       <li><strong>main</strong> should then point at D,</li>
+       <li>and you should end on a fresh empty change on top of it all.</li></ul>
+       <p>Everything you need: <code>abandon</code>, <code>rebase -s</code>,
+       <code>bookmark set</code>, <code>new</code>. Good luck!</p>`,
+    ],
+    objective: 'Abandon X; rebase C–D onto main; move main to D; end on a fresh change on top.',
+    hint: 'jj abandon kp · jj rebase -s kn -d main · jj bookmark set main -r ko · jj new main',
+    start: [
+      'jj commit -m "A"', 'jj commit -m "B"', 'jj bookmark set main -r @-',
+      'jj new kk -m "C"', 'jj new -m "D"', 'jj new kk -m "X"',
+    ],
+    solution: ['jj abandon kp', 'jj rebase -s kn -d main', 'jj bookmark set main -r ko', 'jj new main'],
+  },
+  /* ------------------------------------------------- files ---- */
+  {
+    id: 'files-1', seq: 'files', title: 'Everything is tracked',
+    cards: [
+      `<p>Until now we've abstracted files away. Time to make them real — because jj's
+       biggest day-one surprise lives here: <strong>there is no untracked state and no staging area.</strong></p>
+       <p>The moment a file exists in your working directory, the next jj command snapshots it
+       into <code>@</code>. No <code>git add</code>, no <code>-A</code>, no "changes not staged for commit".</p>
+       <p>This playground gives you a tiny shell: <code>echo &lt;content&gt; &gt; &lt;file&gt;</code> writes a file,
+       <code>cat</code> reads it, <code>ls</code> lists files, <code>rm</code> deletes. Try
+       <code>jj st</code> after writing something.</p>`,
+    ],
+    objective: 'Write "hello world" into notes.txt, then commit the change as "notes".',
+    hint: 'echo hello world > notes.txt, then jj commit -m "notes". Try jj st in between.',
+    start: [],
+    solution: ['echo hello world > notes.txt', 'jj commit -m "notes"'],
+  },
+  {
+    id: 'files-2', seq: 'files', title: 'Keep secrets out',
+    cards: [
+      `<p>Auto-tracking cuts both ways: write <code>secrets.env</code> and it is <em>instantly</em>
+       in <code>@</code>. In git it would sit untracked until you add it; in jj you must actively
+       keep it out.</p>
+       <p>The tools are the same as git's, in a fixed order:</p>
+       <p>1. <code>echo secrets.env &gt; .gitignore</code> — ignore it (jj respects .gitignore).<br>
+       2. <code>jj file untrack secrets.env</code> — pull it back out of <code>@</code>'s snapshot.
+       The file stays on disk, like <code>git rm --cached</code>.</p>
+       <p>jj refuses to untrack a file that isn't ignored — it would just snapshot it right back.</p>`,
+    ],
+    objective: 'You wrote API_KEY=123 into secrets.env. Get it out of @, then commit .gitignore as "add gitignore".',
+    hint: 'echo secrets.env > .gitignore · jj file untrack secrets.env · jj commit -m "add gitignore"',
+    start: ['echo v1 > app.js', 'jj commit -m "app"', 'echo API_KEY=123 > secrets.env'],
+    solution: ['echo secrets.env > .gitignore', 'jj file untrack secrets.env', 'jj commit -m "add gitignore"'],
+  },
+  {
+    id: 'files-3', seq: 'files', title: 'Edit the past directly',
+    cards: [
+      `<p>Commit A shipped <code>config.txt = debug</code> — should have been <code>release</code>.
+       In git you'd do an interactive rebase with an <code>edit</code> stop, or a fixup commit.
+       In jj you just… go there and fix it:</p>
+       <p><code>jj edit &lt;rev&gt;</code> — make the old commit your working copy.<br>
+       <code>echo release &gt; config.txt</code> — the fix is absorbed into that commit.<br>
+       <code>jj new &lt;tip&gt;</code> — head back on top.</p>
+       <p>Every descendant is rebased automatically <em>with its content recomputed</em>.
+       Watch B's commit ID change while its change ID stays put.</p>`,
+    ],
+    objective: 'Fix history: make commit A contain config.txt = "release", then end on a fresh change on top of B.',
+    hint: 'jj edit kk · echo release > config.txt · jj new kl',
+    start: ['echo debug > config.txt', 'jj commit -m "A"', 'echo blue > theme.txt', 'jj commit -m "B"'],
+    solution: ['jj edit kk', 'echo release > config.txt', 'jj new kl'],
+  },
+
+  /* ----------------------------------------------- remotes ---- */
+  {
+    id: 'remotes-1', seq: 'remotes', title: 'Publish a branch',
+    cards: [
+      `<p>How does bookmark-land talk to GitHub/GitLab? Simple mapping:
+       <strong>a jj bookmark <em>is</em> a git branch</strong> when it reaches the remote.
+       <code>main</code> here becomes <code>main</code> on GitHub. Your teammates on git never
+       know you're using jj.</p>
+       <p><code>jj git push --allow-new</code> pushes bookmarks to origin
+       (<code>--allow-new</code> is jj's safety flag for creating a branch that doesn't exist
+       on the remote yet). After a push you'll see a teal <code>main@origin</code> chip —
+       that's the remote-tracking view, git's <code>origin/main</code>.</p>`,
+      `<p>Two guard rails you get for free — jj refuses to push commits that
+       <em>have no description</em> or <em>contain conflicts</em>. And once commits land on
+       <code>main@origin</code> they turn <strong>immutable (◆)</strong>: jj won't let you rewrite
+       shared trunk history by accident. This is the "protected branch" concept, enforced client-side.</p>`,
+    ],
+    objective: 'Push main to origin, creating the branch there.',
+    hint: 'jj git push --allow-new',
+    start: ['jj commit -m "A"', 'jj commit -m "B"', 'jj bookmark create main -r @-'],
+    solution: ['jj git push --allow-new'],
+  },
+  {
+    id: 'remotes-2', seq: 'remotes', title: 'The PR fixup loop',
+    cards: [
+      `<p>You opened a PR from bookmark <code>feat</code>. Review says: <em>"rename login.js
+       to login-form.js"</em>.</p>
+       <p>The git ritual: commit a fixup, interactive-rebase to squash it, then
+       <code>git push --force-with-lease</code> and hope. The jj version: <strong>just edit the
+       commit</strong> — <code>@</code> is already on it — and push again.</p>
+       <p>Because you rewrote the commit, <code>feat@origin</code> shows a dashed
+       <code>*</code> chip: the remote is stale. <code>jj git push</code> moves the branch
+       (jj always pushes rewrites with force-with-lease semantics — safe by default,
+       no flag to remember).</p>`,
+    ],
+    objective: 'Address the review: replace login.js with login-form.js (content "v1"), then update the PR branch on origin.',
+    hint: 'rm login.js · echo v1 > login-form.js · jj git push',
+    start: [
+      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj describe -m "C: add login"', 'echo v1 > login.js',
+      'jj bookmark create feat', 'jj git push --allow-new -b feat',
+    ],
+    solution: ['rm login.js', 'echo v1 > login-form.js', 'jj git push'],
+  },
+  {
+    id: 'remotes-3', seq: 'remotes', title: 'Fetch, rebase, carry on',
+    cards: [
+      `<p>The daily loop with a busy trunk: a teammate merged something while you were working.</p>
+       <p><code>jj git fetch</code> — pull down origin's news. <code>main@origin</code> moves, and
+       your local <code>main</code> bookmark follows it automatically (it's <em>tracking</em> the
+       remote, like git's pull --ff-only, minus the merge-commit hazards).</p>
+       <p>Then put your stack back on top: <code>jj rebase -b @ -d main</code>. Note what's absent:
+       no stash, no checkout, no "please commit your changes first". Your working copy is a commit —
+       it just rebases along with everything else.</p>`,
+    ],
+    objective: 'Fetch the teammate\'s work, then rebase your feature stack (C and D) onto the updated main.',
+    hint: 'jj git fetch · jj rebase -b @ -d main',
+    start: [
+      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj new main -m "C: feature"', 'echo c1 > feature.txt',
+      'jj new -m "D: more feature"', 'echo c2 > feature2.txt',
+    ],
+    remote: [[{ on: 'main', desc: 'teammate: hotfix', files: { 'hotfix.txt': 'fix' } }]],
+    solution: ['jj git fetch', 'jj rebase -b @ -d main'],
+  },
+
+  /* --------------------------------------------- conflicts ---- */
+  {
+    id: 'conflicts-1', seq: 'conflicts', title: 'Your first conflict',
+    cards: [
+      `<p>B changed <code>fruit.txt</code> to <em>bananas</em>; your change C (on A) says
+       <em>cherries</em>. Rebase C onto B and — in git — everything stops: conflict markers in
+       your working tree, a rebase mid-flight, <code>--continue</code> or <code>--abort</code>.</p>
+       <p>In jj <strong>the rebase always completes</strong>. The conflict is recorded <em>inside</em>
+       the commit (the red × node). Nothing is blocking; you can log, switch, even push other
+       branches — the conflict just waits.</p>
+       <p>To resolve here: with <code>@</code> on the conflicted change, inspect it
+       (<code>cat fruit.txt</code> shows real conflict markers, <code>jj st</code> lists conflicted
+       paths) and simply write the file: <code>echo cherries &gt; fruit.txt</code>.</p>`,
+    ],
+    objective: 'Rebase C onto B; then resolve the conflict, keeping "cherries".',
+    hint: 'jj rebase -s kn -d kl · cat fruit.txt · echo cherries > fruit.txt',
+    start: [
+      'echo apples > fruit.txt', 'jj commit -m "A"',
+      'echo bananas > fruit.txt', 'jj commit -m "B"',
+      'jj new kk -m "C"', 'echo cherries > fruit.txt',
+    ],
+    solution: ['jj rebase -s kn -d kl', 'echo cherries > fruit.txt'],
+  },
+  {
+    id: 'conflicts-2', seq: 'conflicts', title: 'Conflicted merges are fine too',
+    cards: [
+      `<p>Merging B (config=v2) with C (config=v3): git would stop at
+       <code>CONFLICT (content): merge conflict</code> and park it in your index.</p>
+       <p>jj happily <em>creates the merge commit with the conflict inside it</em>. The merge
+       exists, history is recorded, and the red × tells you there's homework. Resolve it in the
+       merge commit itself — write the file while <code>@</code> is on it.</p>`,
+    ],
+    objective: 'Merge B and C into a change "M", then resolve config.txt to "v3".',
+    hint: 'jj new kl kn -m "M" · echo v3 > config.txt',
+    start: [
+      'echo v1 > config.txt', 'jj commit -m "A"',
+      'echo v2 > config.txt', 'jj commit -m "B"',
+      'jj new kk -m "C"', 'echo v3 > config.txt',
+    ],
+    solution: ['jj new kl kn -m "M"', 'echo v3 > config.txt'],
+  },
+  {
+    id: 'conflicts-3', seq: 'conflicts', title: 'Heal a whole stack',
+    cards: [
+      `<p>The party trick. Rebase a two-commit stack (C ← D) onto B: C conflicts, and D —
+       built on C — <strong>inherits</strong> the conflict. Two red ×.</p>
+       <p>In git you'd resolve the same conflict once per commit as the rebase replays.
+       In jj you fix it <em>once, at the source</em>: <code>jj edit</code> the first conflicted
+       commit, write the file, and every descendant recomputes and heals automatically.</p>`,
+    ],
+    objective: 'Rebase the C–D stack onto B; fix the conflict in C (keep "v3"); end with @ back on D.',
+    hint: 'jj rebase -s kn -d kl · jj edit kn · echo v3 > config.txt · jj edit ko',
+    start: [
+      'echo v1 > config.txt', 'jj commit -m "A"',
+      'echo v2 > config.txt', 'jj commit -m "B"',
+      'jj new kk -m "C"', 'echo v3 > config.txt',
+      'jj new -m "D"', 'echo done > notes.txt',
+    ],
+    solution: ['jj rebase -s kn -d kl', 'jj edit kn', 'echo v3 > config.txt', 'jj edit ko'],
+  },
+
+  /* -------------------------------------------------- oops ---- */
+  {
+    id: 'oops-1', seq: 'oops', title: 'A secret in history (unpushed)',
+    cards: [
+      `<p>Commit B accidentally includes <code>secrets.env</code>. It hasn't left your machine,
+       so the fix is honest history surgery — and jj makes it a three-liner:</p>
+       <p><code>jj edit &lt;B&gt;</code> · <code>rm secrets.env</code> · <code>jj new &lt;tip&gt;</code></p>
+       <p>The git equivalent is <code>rebase -i</code> with an edit stop, or
+       <code>filter-repo</code> for deeper cases. Here, descendants rebase automatically and the
+       file vanishes from every later snapshot. Because nothing was pushed, nobody ever sees it —
+       this is the <em>good</em> timeline. (Prevention recap: .gitignore + jj file untrack.)</p>`,
+    ],
+    objective: 'Remove secrets.env from commit B entirely, then end on a fresh change on top of C.',
+    hint: 'jj edit kl · rm secrets.env · jj new km',
+    start: [
+      'echo hello > readme.md', 'jj commit -m "A"',
+      'echo KEY=abc123 > secrets.env', 'echo blue > theme.txt', 'jj commit -m "B"',
+      'echo done > notes.txt', 'jj commit -m "C"',
+    ],
+    solution: ['jj edit kl', 'rm secrets.env', 'jj new km'],
+  },
+  {
+    id: 'oops-2', seq: 'oops', title: 'Pushed… to your own PR branch',
+    cards: [
+      `<p>Worse: the secret is already on origin, on your feature branch. Two truths, in order:</p>
+       <p><strong>1. The token is burned.</strong> It was public, even briefly — rotate it.
+       No amount of history editing un-leaks a secret.</p>
+       <p><strong>2. Clean the branch anyway</strong> so the merged history is clean:
+       fix the commit (<code>rm secrets.env</code> — <code>@</code> is on it), and
+       <code>jj git push</code>. Feature branches aren't trunk, so they stay mutable, and jj
+       force-pushes rewrites safely by default. This is the same PR-fixup move you already know.</p>`,
+    ],
+    objective: 'Remove secrets.env from the feature commit and update feat on origin. (And in real life: rotate the token!)',
+    hint: 'rm secrets.env · jj git push',
+    start: [
+      'jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push --allow-new',
+      'jj describe -m "F: deploy script"', 'echo run > deploy.sh', 'echo TOKEN=xyz > secrets.env',
+      'jj bookmark create feat', 'jj git push --allow-new -b feat',
+    ],
+    solution: ['rm secrets.env', 'jj git push'],
+  },
+  {
+    id: 'oops-3', seq: 'oops', title: 'Pushed to main: the revert',
+    cards: [
+      `<p>Worst case: the secret is on <code>main@origin</code>. Those commits are
+       <strong>immutable (◆)</strong> — try <code>jj edit kl</code> and jj will refuse.
+       That's the point: rewriting shared trunk history breaks every teammate's repo and
+       requires a coordinated force-push (git's filter-repo/BFG day).</p>
+       <p>The sane play is the same as git's: <strong>revert forward</strong>.
+       <code>jj revert -r &lt;bad&gt; -d main</code> creates an inverse commit that deletes the file;
+       move main to it and push.</p>
+       <p>Be clear-eyed: the secret is still in the old commit on origin, visible to anyone.
+       <strong>Rotate the credential.</strong> The revert fixes the tip; rotation fixes the leak.</p>`,
+    ],
+    objective: 'Revert the bad commit onto main, move main to the revert, and push.',
+    hint: 'jj revert -r kl -d main · jj bookmark set main -r kn · jj git push',
+    start: [
+      'echo hello > app.js', 'jj commit -m "A"',
+      'echo KEY=oops > secrets.env', 'jj commit -m "add deploy config"',
+      'jj bookmark create main -r @-', 'jj git push --allow-new',
+    ],
+    solution: ['jj revert -r kl -d main', 'jj bookmark set main -r kn', 'jj git push'],
+  },
+];
+
+const LevelData = { SEQUENCES, LEVELS };
+if (typeof module !== 'undefined' && module.exports) module.exports = LevelData;
+else global.LevelData = LevelData;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+/* main.js — UI: terminal, level management, goal pane, modals, progress. */
+(function () {
+'use strict';
+
+const { JJEngine, canonState, diffStates } = window.JJ;
+const { SEQUENCES, LEVELS } = window.LevelData;
+const SEED = 20260712;
+
+const $ = s => document.querySelector(s);
+const termOut = $('#termOut');
+const termInput = $('#termInput');
+const mainSvg = $('#mainGraph');
+const goalSvg = $('#goalGraph');
+
+const state = {
+  engine: null,
+  level: null,        // null = sandbox
+  goalState: null,
+  goalCanon: null,
+  solved: false,
+  cmdCount: 0,
+  history: [],
+  histIdx: -1,
+};
+
+/* ---------------- progress (localStorage, optional) ---------------- */
+function loadProgress() {
+  try { return JSON.parse(localStorage.getItem('learnjj-progress') || '{}'); }
+  catch { return {}; }
+}
+function saveProgress(p) {
+  try { localStorage.setItem('learnjj-progress', JSON.stringify(p)); } catch {}
+}
+
+/* ---------------- terminal ---------------- */
+function print(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'tline' + (cls ? ' t-' + cls : '');
+  div.textContent = text;
+  termOut.appendChild(div);
+  termOut.scrollTop = termOut.scrollHeight;
+}
+function printLines(lines) { for (const l of lines) print(l.t, l.c); }
+
+function echo(cmd) { print('$ ' + cmd, 'cmd'); }
+
+const HELP = [
+  ['jj new [rev…] [-m msg]', 'start a change (multiple revs = merge; -B/-A rev = insert before/after)'],
+  ['jj describe -m "msg"', 'describe @ (or -r rev)'],
+  ['jj commit -m "msg"', 'describe @ and start the next change'],
+  ['jj edit <rev>', 'make an existing change the working copy'],
+  ['jj squash [-r rev]', 'fold a change into its parent'],
+  ['jj abandon [rev…]', 'remove changes; descendants auto-rebase'],
+  ['jj rebase (-r|-s|-b) <rev> -d <dest>', 'move one rev / a subtree / a branch'],
+  ['jj bookmark create|set|move|delete|list', 'manage bookmarks'],
+  ['jj duplicate [rev]', 'copy a change'],
+  ['jj undo · jj op log', 'the operation log & repo-wide undo'],
+  ['jj git push [--allow-new] [-b name] · jj git fetch', 'talk to origin (GitHub/GitLab)'],
+  ['jj file untrack <file>', 'stop tracking a file (add it to .gitignore first)'],
+  ['jj revert -r <rev> -d <dest>', 'create an inverse commit (for immutable history)'],
+  ['echo <text> > <file> · cat <file> · ls · rm <file>', 'tiny shell — files snapshot into @ automatically'],
+  ['jj log · jj st · jj resolve', 'inspect the repo / conflict help'],
+  ['check', 'compare your graph with the goal and list what differs'],
+  ['levels · hint · solution · reset · objective · clear', 'playground commands'],
+];
+function showHelp() {
+  print('Commands in this playground:', 'ok');
+  for (const [cmd, what] of HELP) { print('  ' + cmd, 'cmd2'); print('      ' + what, 'dim'); }
+}
+
+/* ---------------- level management ---------------- */
+function replayEngine(cmds, remoteScript) {
+  const e = new JJEngine(SEED);
+  e.setRemoteScript(remoteScript || []);
+  for (const c of cmds) e.run(c);
+  return e;
+}
+
+function levelById(id) { return LEVELS.find(l => l.id === id); }
+function levelIndex(lv) { return LEVELS.indexOf(lv); }
+
+function loadLevel(lv, { showIntro = true } = {}) {
+  state.level = lv;
+  state.engine = replayEngine(lv.start, lv.remote);
+  const goalEngine = replayEngine([...lv.start, ...lv.solution], lv.remote);
+  state.goalState = goalEngine.getState();
+  state.goalCanon = canonState(state.goalState, { checkWC: lv.checkWC !== false });
+  state.solved = false;
+  state.cmdCount = 0;
+  window.GraphView.resetView(mainSvg);
+  window.GraphView.resetView(goalSvg);
+  location.hash = lv.id;
+
+  const seq = SEQUENCES.find(s => s.id === lv.seq);
+  $('#levelName').textContent = `${seq.title} · ${levelIndex(lv) + 1}. ${lv.title}`;
+  $('#objectiveText').textContent = lv.objective;
+  $('#goalPane').classList.remove('hidden');
+  $('#winBanner').classList.add('hidden');
+  document.body.classList.remove('sandbox');
+
+  termOut.innerHTML = '';
+  print(`— Level: ${lv.title} —`, 'ok');
+  print('Objective: ' + lv.objective, 'dim');
+  print('Type "help" for commands, "hint" if stuck.', 'dim');
+  renderAll();
+  if (showIntro) openIntro(lv);
+  termInput.focus();
+}
+
+function loadSandbox() {
+  state.level = null;
+  state.engine = new JJEngine(SEED);
+  state.goalState = null;
+  state.solved = false;
+  state.cmdCount = 0;
+  window.GraphView.resetView(mainSvg);
+  location.hash = 'sandbox';
+  $('#levelName').textContent = 'Sandbox';
+  $('#objectiveText').textContent = 'Free play — no goal. Every command is fair game.';
+  $('#goalPane').classList.add('hidden');
+  $('#winBanner').classList.add('hidden');
+  document.body.classList.add('sandbox');
+  termOut.innerHTML = '';
+  print('— Sandbox — a fresh repo, no goal. Go wild.', 'ok');
+  renderAll();
+  termInput.focus();
+}
+
+function renderAll() {
+  window.GraphView.render(mainSvg, state.engine.getState());
+  if (state.level) window.GraphView.render(goalSvg, state.goalState);
+}
+
+function runCheck() {
+  if (!state.level) { print('No goal in the sandbox — nothing to compare.', 'dim'); return; }
+  if (state.solved) { print('Already solved ✓ — keep experimenting or type "next".', 'ok'); return; }
+  const msgs = diffStates(state.engine.getState(), state.goalState, { checkWC: state.level.checkWC !== false });
+  if (!msgs.length) { print('Everything matches the goal!', 'ok'); checkWin(); return; }
+  print('Comparing with the goal:', 'ok');
+  msgs.forEach(m => print('  · ' + m, 'dim'));
+}
+
+function checkWin() {
+  if (!state.level || state.solved) return;
+  const canon = canonState(state.engine.getState(), { checkWC: state.level.checkWC !== false });
+  if (canon !== state.goalCanon) {
+    // Near-miss nudge: the shape matches but @ isn't where the goal wants it.
+    const relaxedU = canonState(state.engine.getState(), { checkWC: false });
+    const relaxedG = canonState(state.goalState, { checkWC: false });
+    if (relaxedU === relaxedG) {
+      print('Almost! The graph shape matches the goal — but @ is not where the goal wants it (compare the @ badge in the Goal panel). Type "check" for details.', 'dim');
+    }
+    return;
+  }
+  state.solved = true;
+  const p = loadProgress();
+  const prev = p[state.level.id];
+  p[state.level.id] = { solved: true, best: Math.min(prev?.best ?? Infinity, state.cmdCount) };
+  saveProgress(p);
+  $('#winBanner').classList.remove('hidden');
+  setTimeout(() => openWin(), 550);
+}
+
+/* ---------------- command execution ---------------- */
+function exec(raw) {
+  const line = raw.trim();
+  if (!line) return;
+  echo(line);
+  state.history.push(line);
+  state.histIdx = state.history.length;
+
+  const bare = line.toLowerCase();
+  if (bare === 'help' || bare === 'jj help' || bare === '?') return showHelp();
+  if (bare === 'clear') { termOut.innerHTML = ''; return; }
+  if (bare === 'levels') return openLevels();
+  if (bare === 'reset') { state.level ? loadLevel(state.level, { showIntro: false }) : loadSandbox(); return; }
+  if (bare === 'sandbox') return loadSandbox();
+  if (bare === 'objective') { print('Objective: ' + ($('#objectiveText').textContent), 'ok'); return; }
+  if (bare === 'check' || bare === 'compare') return runCheck();
+  if (bare === 'hint') {
+    print(state.level ? 'Hint: ' + state.level.hint : 'No hints in the sandbox — you make the rules.', 'dim');
+    return;
+  }
+  if (bare === 'solution') {
+    if (!state.level) { print('No solution in the sandbox.', 'dim'); return; }
+    print('One solution (' + state.level.solution.length + ' commands):', 'ok');
+    state.level.solution.forEach(c => print('  ' + c, 'cmd2'));
+    return;
+  }
+  if (bare === 'next') {
+    const idx = state.level ? levelIndex(state.level) : -1;
+    if (idx >= 0 && idx + 1 < LEVELS.length) loadLevel(LEVELS[idx + 1]);
+    else print('No next level — try "levels" or "sandbox".', 'dim');
+    return;
+  }
+  if (bare.startsWith('git ') || bare === 'git') {
+    print('This is a jj playground — but fair guess!', 'err');
+    print('Hint: real jj works inside git repos too (jj git init --colocate). Try the jj spelling — e.g. jj git push. "help" lists commands.', 'dim');
+    return;
+  }
+  if (!/^(jj|echo|cat|rm|ls)( |$)/.test(bare)) {
+    print(`Unknown command "${line.split(' ')[0]}". Type "help".`, 'err');
+    return;
+  }
+
+  const res = state.engine.run(line);
+  printLines(res.lines);
+  if (res.mutated) state.cmdCount++;
+  renderAll();
+  checkWin();
+}
+
+/* ---------------- modals ---------------- */
+function openModal(id) { $('#' + id).classList.remove('hidden'); }
+function closeModals() { document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden')); termInput.focus(); }
+
+function openIntro(lv) {
+  let idx = 0;
+  const body = $('#introBody');
+  const render = () => {
+    body.innerHTML = lv.cards[idx];
+    $('#introTitle').textContent = lv.title;
+    $('#introDots').textContent = lv.cards.map((_, i) => (i === idx ? '●' : '○')).join(' ');
+    $('#introPrev').disabled = idx === 0;
+    $('#introNext').textContent = idx === lv.cards.length - 1 ? 'Start ▸' : 'Next ▸';
+  };
+  $('#introPrev').onclick = () => { if (idx > 0) { idx--; render(); } };
+  $('#introNext').onclick = () => { if (idx < lv.cards.length - 1) { idx++; render(); } else closeModals(); };
+  render();
+  openModal('introModal');
+}
+
+function openWin() {
+  const lv = state.level;
+  const par = lv.solution.length;
+  $('#winStats').textContent =
+    `Solved in ${state.cmdCount} command${state.cmdCount === 1 ? '' : 's'} — par is ${par}.` +
+    (state.cmdCount <= par ? ' 🏆 Optimal!' : '');
+  const idx = levelIndex(lv);
+  $('#winNext').style.display = idx + 1 < LEVELS.length ? '' : 'none';
+  openModal('winModal');
+}
+
+function openLevels() {
+  const wrap = $('#levelList');
+  wrap.innerHTML = '';
+  const progress = loadProgress();
+  for (const seq of SEQUENCES) {
+    const h = document.createElement('div');
+    h.className = 'seqHeader';
+    h.innerHTML = `<div class="seqTitle">${seq.title}</div><div class="seqBlurb">${seq.blurb}</div>`;
+    wrap.appendChild(h);
+    const grid = document.createElement('div');
+    grid.className = 'levelGrid';
+    LEVELS.filter(l => l.seq === seq.id).forEach(lv => {
+      const solved = progress[lv.id]?.solved;
+      const btn = document.createElement('button');
+      btn.className = 'levelCard' + (solved ? ' solved' : '');
+      btn.innerHTML = `<span class="lvNum">${levelIndex(lv) + 1}</span><span class="lvTitle">${lv.title}</span><span class="lvCheck">${solved ? '✓' : ''}</span>`;
+      btn.onclick = () => { closeModals(); loadLevel(lv); };
+      grid.appendChild(btn);
+    });
+    wrap.appendChild(grid);
+  }
+  const sand = document.createElement('button');
+  sand.className = 'levelCard sandboxCard';
+  sand.innerHTML = `<span class="lvNum">∞</span><span class="lvTitle">Sandbox — free play</span><span class="lvCheck"></span>`;
+  sand.onclick = () => { closeModals(); loadSandbox(); };
+  wrap.appendChild(sand);
+  openModal('levelsModal');
+}
+
+/* ---------------- wiring ---------------- */
+termInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = termInput.value;
+    termInput.value = '';
+    exec(v);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (state.histIdx > 0) { state.histIdx--; termInput.value = state.history[state.histIdx] || ''; }
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (state.histIdx < state.history.length) { state.histIdx++; termInput.value = state.history[state.histIdx] || ''; }
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModals();
+  if (document.activeElement !== termInput && !e.metaKey && !e.ctrlKey && !e.altKey &&
+      e.key.length === 1 && !document.querySelector('.overlay:not(.hidden)')) {
+    termInput.focus();
+  }
+});
+$('#terminal').addEventListener('click', () => termInput.focus());
+
+$('#btnLevels').onclick = openLevels;
+$('#btnHint').onclick = () => exec('hint');
+$('#btnReset').onclick = () => exec('reset');
+$('#btnHelp').onclick = () => { showHelp(); termInput.focus(); };
+$('#btnGoalToggle').onclick = () => $('#goalPane').classList.toggle('collapsed');
+$('#btnIntroAgain').onclick = () => { if (state.level) openIntro(state.level); };
+$('#winNext').onclick = () => { closeModals(); exec('next'); };
+$('#winStay').onclick = closeModals;
+$('#winLevels').onclick = () => { closeModals(); openLevels(); };
+document.querySelectorAll('.overlay').forEach(o => {
+  o.addEventListener('mousedown', e => { if (e.target === o) closeModals(); });
+});
+document.querySelectorAll('.modalClose').forEach(b => { b.onclick = closeModals; });
+
+/* ---------------- boot ---------------- */
+(function boot() {
+  const hash = location.hash.replace('#', '');
+  if (hash === 'sandbox') return loadSandbox();
+  const lv = levelById(hash);
+  if (lv) return loadLevel(lv);
+  const progress = loadProgress();
+  const firstUnsolved = LEVELS.find(l => !progress[l.id]?.solved) || LEVELS[0];
+  loadLevel(firstUnsolved);
+})();
+})();
+
+</script>
