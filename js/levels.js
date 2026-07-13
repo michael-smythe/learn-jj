@@ -27,7 +27,8 @@ const LEVELS = [
     cards: [
       `<p><strong>Welcome!</strong> This is an interactive playground for
        <a href="https://jj-vcs.github.io/jj/latest/" target="_blank" rel="noreferrer">Jujutsu (jj)</a>,
-       in the spirit of <em>Learn Git Branching</em>.</p>
+       inspired by Peter Cottle's wonderful
+       <a href="https://learngitbranching.js.org" target="_blank" rel="noreferrer">Learn Git Branching</a>.</p>
        <p>The single most important idea in jj: <strong>your working copy is itself a commit</strong>,
        shown as <code>@</code> in the graph. There is no staging area and no "uncommitted changes" —
        as you edit files, <code>@</code> automatically absorbs your work.</p>

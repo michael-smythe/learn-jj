@@ -189,6 +189,9 @@ body.sandbox #goalPane { display: none; }
 .levelCard .lvCheck { color: var(--green); font-weight: 700; }
 .levelCard.solved { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
 .sandboxCard { margin-top: 14px; width: 100%; }
+.creditLine { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--dim); text-align: center; }
+.creditLine a { color: var(--accent); text-decoration: none; }
+.creditLine a:hover { text-decoration: underline; }
 
 /* ---------------- narrow screens ---------------- */
 @media (max-width: 760px) {

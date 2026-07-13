@@ -74,3 +74,15 @@ node tools/build-single.mjs   # → dist/learn-jj.html
 ```
 
 Produces one self-contained HTML file with everything inlined.
+
+## Acknowledgements
+
+This project is directly inspired by [Learn Git Branching](https://learngitbranching.js.org)
+by [Peter Cottle](https://github.com/pcottle) ([pcottle/learnGitBranching](https://github.com/pcottle/learnGitBranching)) —
+the interactive "type commands, watch the graph respond, match the goal" format that taught
+a generation of developers git is entirely his idea. This site borrows that format with
+gratitude and applies it to [Jujutsu](https://jj-vcs.github.io/jj/latest/). No code is
+shared between the projects; learn-jj is an independent implementation.
+
+Thanks also to the [jj contributors](https://github.com/jj-vcs/jj) for building a VCS
+worth teaching.

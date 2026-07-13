@@ -267,6 +267,12 @@ function openLevels() {
   sand.innerHTML = `<span class="lvNum">∞</span><span class="lvTitle">Sandbox — free play</span><span class="lvCheck"></span>`;
   sand.onclick = () => { closeModals(); loadSandbox(); };
   wrap.appendChild(sand);
+  const credit = document.createElement('div');
+  credit.className = 'creditLine';
+  credit.innerHTML = `Format inspired by <a href="https://learngitbranching.js.org" target="_blank" rel="noreferrer">Learn Git Branching</a>
+    by <a href="https://github.com/pcottle" target="_blank" rel="noreferrer">Peter Cottle</a> ♥
+    · <a href="https://github.com/michael-smythe/learn-jj" target="_blank" rel="noreferrer">learn-jj source</a>`;
+  wrap.appendChild(credit);
   openModal('levelsModal');
 }
 

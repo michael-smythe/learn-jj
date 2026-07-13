@@ -192,6 +192,9 @@ body.sandbox #goalPane { display: none; }
 .levelCard .lvCheck { color: var(--green); font-weight: 700; }
 .levelCard.solved { border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
 .sandboxCard { margin-top: 14px; width: 100%; }
+.creditLine { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--dim); text-align: center; }
+.creditLine a { color: var(--accent); text-decoration: none; }
+.creditLine a:hover { text-decoration: underline; }
 
 /* ---------------- narrow screens ---------------- */
 @media (max-width: 760px) {
@@ -1848,7 +1851,8 @@ const LEVELS = [
     cards: [
       `<p><strong>Welcome!</strong> This is an interactive playground for
        <a href="https://jj-vcs.github.io/jj/latest/" target="_blank" rel="noreferrer">Jujutsu (jj)</a>,
-       in the spirit of <em>Learn Git Branching</em>.</p>
+       inspired by Peter Cottle's wonderful
+       <a href="https://learngitbranching.js.org" target="_blank" rel="noreferrer">Learn Git Branching</a>.</p>
        <p>The single most important idea in jj: <strong>your working copy is itself a commit</strong>,
        shown as <code>@</code> in the graph. There is no staging area and no "uncommitted changes" —
        as you edit files, <code>@</code> automatically absorbs your work.</p>
@@ -2576,6 +2580,12 @@ function openLevels() {
   sand.innerHTML = `<span class="lvNum">∞</span><span class="lvTitle">Sandbox — free play</span><span class="lvCheck"></span>`;
   sand.onclick = () => { closeModals(); loadSandbox(); };
   wrap.appendChild(sand);
+  const credit = document.createElement('div');
+  credit.className = 'creditLine';
+  credit.innerHTML = `Format inspired by <a href="https://learngitbranching.js.org" target="_blank" rel="noreferrer">Learn Git Branching</a>
+    by <a href="https://github.com/pcottle" target="_blank" rel="noreferrer">Peter Cottle</a> ♥
+    · <a href="https://github.com/michael-smythe/learn-jj" target="_blank" rel="noreferrer">learn-jj source</a>`;
+  wrap.appendChild(credit);
   openModal('levelsModal');
 }
 
