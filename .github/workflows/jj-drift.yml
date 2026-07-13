@@ -55,17 +55,19 @@ jobs:
         run: |
           VERSION=$(jj --version)
           gh label create jj-drift --description "jj behavior drift detected by CI" --color D93F0B --force || true
-          gh issue create \
-            --title "jj drift detected: $VERSION" \
-            --body "The weekly drift check regenerated transcripts against **$VERSION** and the conformance suite failed — jj's behavior or output has changed since the committed fixtures.
-
-Reproduce locally:
-\`\`\`sh
-brew upgrade jj   # or install $VERSION
-npm run transcripts
-npm test
-\`\`\`
-Then align the simulator (js/engine.js messages/semantics), update levels if flags changed, and commit the regenerated test/transcripts.json.
-
-Run details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --label "jj-drift" || echo "(issue creation failed — check run logs)"
+          {
+            echo "The weekly drift check regenerated transcripts against **$VERSION** and the conformance suite failed — jj's behavior or output has changed since the committed fixtures."
+            echo ""
+            echo "Reproduce locally:"
+            echo '```sh'
+            echo "brew upgrade jj   # or install $VERSION"
+            echo "npm run transcripts"
+            echo "npm test"
+            echo '```'
+            echo ""
+            echo "Then align the simulator (js/engine.js messages/semantics), update levels if flags changed, and commit the regenerated test/transcripts.json."
+            echo ""
+            echo "Run details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          } > /tmp/drift-issue.md
+          gh issue create --title "jj drift detected: $VERSION" --body-file /tmp/drift-issue.md --label "jj-drift" \
+            || echo "(issue creation failed — check run logs)"
