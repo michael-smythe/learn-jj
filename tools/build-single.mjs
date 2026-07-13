@@ -14,7 +14,7 @@ const body = html
   .match(/<body>([\s\S]*)<\/body>/)[1]
   .replace(/<script[^>]*><\/script>\s*/g, '');
 
-const js = ['js/engine.js', 'js/graph.js', 'js/levels.js', 'js/main.js'].map(read).join('\n');
+const js = ['js/compare.js', 'js/engine.js', 'js/graph.js', 'js/levels.js', 'js/main.js'].map(read).join('\n');
 
 const out = `<meta charset="utf-8">
 <title>Learn jj — an interactive Jujutsu tutorial</title>

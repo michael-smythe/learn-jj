@@ -25,8 +25,10 @@ const state = {
 
 /* ---------------- progress (localStorage, optional) ---------------- */
 function loadProgress() {
-  try { return JSON.parse(localStorage.getItem('learnjj-progress') || '{}'); }
-  catch { return {}; }
+  try {
+    const v = JSON.parse(localStorage.getItem('learnjj-progress') || '{}');
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch { return {}; }
 }
 function saveProgress(p) {
   try { localStorage.setItem('learnjj-progress', JSON.stringify(p)); } catch {}
@@ -154,7 +156,7 @@ function renderFiles() {
     return;
   }
   for (const n of names) {
-    const conflicted = tree[n] === '!conflict';
+    const conflicted = !!(tree[n] && typeof tree[n] === 'object');
     const chip = document.createElement('button');
     chip.className = 'fileChip' + (conflicted ? ' conflict' : '');
     chip.textContent = (conflicted ? '× ' : '') + n;
@@ -237,7 +239,19 @@ function exec(raw) {
     return;
   }
 
-  const res = state.engine.run(line);
+  let res;
+  try {
+    res = state.engine.run(line);
+  } catch (err) {
+    // Should never happen — but if an engine bug throws, roll back and keep
+    // the playground usable instead of silently breaking the input loop.
+    console.error(err);
+    print('Internal playground error — the command was rolled back.', 'err');
+    print(String((err && err.message) || err), 'dim');
+    try { state.engine._restoreLast(); } catch (_) { /* last resort: leave as-is */ }
+    renderAll();
+    return;
+  }
   printLines(res.lines);
   if (res.mutated) state.cmdCount++;
   renderAll();

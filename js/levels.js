@@ -610,14 +610,14 @@ const LEVELS = [
        mutable — <code>rm debug.log</code>) and push the rewrite. And if a <em>secret</em>
        ever reaches origin, no local command un-leaks it: rotate it.</p>`,
     ],
-    objective: 'Try the undo (it will not stick) — then actually clean debug.log off feat and push the fix.',
-    hint: 'jj undo · jj git fetch (surprise!) · rm debug.log · jj git push',
+    objective: 'Explore why undo will not stick, then actually clean debug.log off feat and push the fix.',
+    hint: 'Explore first: jj undo, then jj git fetch (watch the chip return). The real fix — and the par: rm debug.log · jj git push',
     start: [
       'jj commit -m "A: base"', 'jj bookmark create main -r @-', 'jj git push -b main',
       'jj describe -m "F: metrics dashboard"', 'echo charts > metrics.js', 'echo verbose > debug.log',
       'jj bookmark create feat', 'jj git push -b feat',
     ],
-    solution: ['jj undo', 'jj git fetch', 'rm debug.log', 'jj git push'],
+    solution: ['rm debug.log', 'jj git push'],
   },
   {
     id: 'fieldguide-2', seq: 'fieldguide', title: 'Living with git (colocation)',

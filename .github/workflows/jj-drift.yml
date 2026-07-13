@@ -1,0 +1,71 @@
+# Watches for new jj releases: installs the latest jj binary, regenerates the
+# golden transcripts against it, and runs the conformance suite. If jj's
+# behavior or output changed since the committed fixtures, this fails and
+# opens an issue listing the drift.
+name: jj-drift
+on:
+  schedule:
+    - cron: '17 6 * * 1'   # weekly, Monday morning UTC
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install latest jj release
+        run: |
+          set -euo pipefail
+          URL=$(curl -s https://api.github.com/repos/jj-vcs/jj/releases/latest \
+            | grep browser_download_url \
+            | grep x86_64-unknown-linux-musl \
+            | grep -v sha256 | head -1 | cut -d '"' -f4)
+          echo "Downloading $URL"
+          curl -sL "$URL" -o jj.tar.gz
+          mkdir -p jjbin && tar xzf jj.tar.gz -C jjbin
+          JJ=$(find jjbin -name jj -type f | head -1)
+          sudo install "$JJ" /usr/local/bin/jj
+          jj --version
+
+      - name: Regenerate transcripts against latest jj
+        run: |
+          git config --global user.name  "drift-bot"
+          git config --global user.email "drift@example.com"
+          git config --global init.defaultBranch main
+          node tools/gen-transcripts.mjs
+
+      - name: Conformance against fresh transcripts
+        id: conformance
+        run: node test/conformance.mjs
+
+      - name: Level + fuzz suites still green
+        run: node test/run-levels.mjs && node test/fuzz.mjs
+
+      - name: Open an issue on drift
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(jj --version)
+          gh label create jj-drift --description "jj behavior drift detected by CI" --color D93F0B --force || true
+          gh issue create \
+            --title "jj drift detected: $VERSION" \
+            --body "The weekly drift check regenerated transcripts against **$VERSION** and the conformance suite failed — jj's behavior or output has changed since the committed fixtures.
+
+Reproduce locally:
+\`\`\`sh
+brew upgrade jj   # or install $VERSION
+npm run transcripts
+npm test
+\`\`\`
+Then align the simulator (js/engine.js messages/semantics), update levels if flags changed, and commit the regenerated test/transcripts.json.
+
+Run details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --label "jj-drift" || echo "(issue creation failed — check run logs)"

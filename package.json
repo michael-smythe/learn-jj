@@ -1,0 +1,19 @@
+{
+  "name": "learn-jj",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive tutorial for the Jujutsu (jj) VCS, inspired by Learn Git Branching",
+  "homepage": "https://michael-smythe.github.io/learn-jj/",
+  "repository": "github:michael-smythe/learn-jj",
+  "license": "MIT",
+  "scripts": {
+    "test": "node test/run-levels.mjs && node test/conformance.mjs && node test/fuzz.mjs",
+    "test:levels": "node test/run-levels.mjs",
+    "test:conformance": "node test/conformance.mjs",
+    "test:fuzz": "node test/fuzz.mjs",
+    "transcripts": "node tools/gen-transcripts.mjs",
+    "bundle": "node tools/build-single.mjs",
+    "bump": "node tools/bump-version.mjs",
+    "start": "python3 -m http.server 8677 -d ."
+  }
+}

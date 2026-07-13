@@ -134,7 +134,7 @@ function expect(cond, msg) {
   st = e.getState();
   const cNode = st.changes.find(c => c.desc === 'C');
   expect(cNode.conflicted, 'rebase onto divergent edit creates a conflict');
-  expect(cNode.tree['fruit.txt'] === '!conflict', 'conflicted tree value is marked');
+  expect(!!(cNode.tree['fruit.txt'] && typeof cNode.tree['fruit.txt'] === 'object'), 'conflicted tree value is marked');
   const cat = e.run('cat fruit.txt');
   expect(cat.ok && cat.lines.some(l => l.t.includes('<<<<<<<')), 'cat shows conflict markers');
   e.run('echo cherries > fruit.txt');
@@ -206,6 +206,76 @@ function expect(cond, msg) {
   const rev = st.changes.find(c => c.desc.startsWith('Revert'));
   expect(rev && !('secrets.env' in rev.tree), 'revert removes the file from its tree');
   expect('secrets.env' in st.changes.find(c => c.desc === 'bad').tree, 'original commit still has the file (history preserved)');
+}
+
+{
+  // Regressions from the adversarial review (2026-07).
+  // F1: abandoning a merge @ plus both parents must not duplicate parents.
+  const e = new JJ.JJEngine(1);
+  ['jj commit -m "A"', 'jj describe -m "B"', 'jj new desc(A) -m "C"',
+   'jj new desc(B) desc(C) -m "M"', 'jj abandon @ desc(B) desc(C)'].forEach(c => e.run(c));
+  const wc = e.getState().changes.find(c => c.id === e.wc);
+  expect(new Set(wc.parents).size === wc.parents.length, 'abandon(merge+parents) leaves no duplicate parents');
+
+  // F2: rebase -r already at destination is a no-op even with children.
+  const r = new JJ.JJEngine(2);
+  ['jj commit -m "A"', 'jj commit -m "B"', 'jj commit -m "C"'].forEach(c => r.run(c));
+  const before = JJ.canonState(r.getState());
+  const out = r.run('jj rebase -r desc(A) -d root()');
+  expect(out.ok && JJ.canonState(r.getState()) === before, 'rebase -r already-in-place changes nothing');
+
+  // F8: jj commit cannot rewrite an immutable working copy.
+  const im = new JJ.JJEngine(3);
+  ['jj describe -m "F"', 'jj bookmark create main', 'jj git push -b main'].forEach(c => im.run(c));
+  expect(!im.run('jj commit -m "sneaky rewrite"').ok, 'jj commit refuses immutable @');
+
+  // F3: squash preserves the other side of a conflicted bookmark.
+  const s = new JJ.JJEngine(4);
+  s.setRemoteScript([[{ on: 'feat', desc: 'teammate', files: { 't.txt': 'x' } }]]);
+  ['jj commit -m "base"', 'jj bookmark create feat -r @-', 'jj git push -b feat',
+   'jj commit -m "mine1"', 'jj commit -m "mine2"', 'jj bookmark set feat -r @-',
+   'jj git fetch'].forEach(c => s.run(c));
+  s.run('jj squash -r desc(mine2)');
+  const featVal = s.getState().bookmarks.feat;
+  expect(typeof featVal === 'object' && featVal.conflict.length === 2, 'squash keeps conflicted bookmark conflicted');
+
+  // F7/F9: undo of a fetch, then fetch again, restores cleanly (no crash, no dangle).
+  const u = new JJ.JJEngine(5);
+  u.setRemoteScript([[{ on: 'main', desc: 'teammate', files: { 't.txt': 'x' } }]]);
+  ['jj commit -m "A"', 'jj bookmark create main -r @-', 'jj git push -b main'].forEach(c => u.run(c));
+  expect(u.run('jj git fetch').ok && u.run('jj undo').ok, 'undo of fetch works');
+  const refetch = u.run('jj git fetch');
+  expect(refetch.ok && refetch.lines.some(l => l.t.includes('main@origin [updated]')), 're-fetch after undo restores the server state');
+
+  // F9: abandoning a remote-referenced commit drops the view; fetch restores it.
+  const a = new JJ.JJEngine(6);
+  ['jj describe -m "F"', 'echo v > f.txt', 'jj bookmark create feat', 'jj git push -b feat'].forEach(c => a.run(c));
+  a.run('jj abandon @');
+  expect(!('feat' in a.getState().remoteBookmarks), 'abandon drops the dangling origin view');
+  const back = a.run('jj git fetch');
+  expect(back.ok && 'feat' in a.getState().remoteBookmarks, 'fetch respawns the abandoned-but-pushed commit');
+
+  // F10: the hint's jj git push --deleted actually works.
+  expect(a.run('jj bookmark delete feat').ok || true, 'setup: delete local feat');
+  const del = a.run('jj git push --deleted');
+  expect(del.ok && !('feat' in a.getState().remoteBookmarks), 'jj git push --deleted removes the remote branch');
+
+  // F11: a literal file containing "!conflict" is not mistaken for a conflict.
+  const lit = new JJ.JJEngine(7);
+  lit.run('echo !conflict > f.txt');
+  const tree = lit.getState().changes.find(c => c.id === lit.wc).tree;
+  expect(tree['f.txt'] === '!conflict' && typeof tree['f.txt'] === 'string', 'literal !conflict content stays a string');
+
+  // F15: anonymous file-only commits are visible to win detection.
+  const w1 = new JJ.JJEngine(8); w1.run('jj commit -m "A"');
+  const w2 = new JJ.JJEngine(8); w2.run('jj commit -m "A"');
+  w2.run('echo junk > junk.txt'); w2.run('jj new');
+  expect(JJ.canonState(w1.getState()) !== JJ.canonState(w2.getState()), 'anonymous file-bearing commits affect the canon');
+
+  // F4: jj new --no-edit leaves @ in place.
+  const ne = new JJ.JJEngine(9); ne.run('jj commit -m "A"');
+  const wcBefore = ne.wc;
+  expect(ne.run('jj new desc(A) --no-edit').ok && ne.wc === wcBefore, 'jj new --no-edit does not move @');
 }
 
 if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }

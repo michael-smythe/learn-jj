@@ -338,20 +338,7 @@ class JJEngine {
     const trees = new Map();
     for (const id of order) {
       const c = this.get(id);
-      let tree;
-      const ps = c.parents.filter(p => trees.has(p));
-      if (!ps.length) tree = {};
-      else if (ps.length === 1) tree = { ...trees.get(ps[0]) };
-      else {
-        tree = trees.get(ps[0]);
-        let accId = ps[0];
-        for (let i = 1; i < ps.length; i++) {
-          const baseId = this._lca(accId, ps[i]);
-          tree = this._merge3(baseId ? trees.get(baseId) : {}, tree, trees.get(ps[i]));
-          accId = baseId ?? accId;
-        }
-        tree = { ...tree };
-      }
+      const tree = this._mergeParentTrees(c.parents, trees);
       for (const [f, patch] of Object.entries(c.files)) {
         const cur = tree[f] ?? null;
         const from = patch.from ?? null, to = patch.to ?? null;
@@ -367,14 +354,26 @@ class JJEngine {
     return trees;
   }
 
-  /* Tree the working copy sees before its own patches. */
-  _baseTreeOf(id, trees) {
-    const c = this.get(id);
-    const saved = c.files;
-    c.files = {};
-    const t = this.computeTrees().get(id);
-    c.files = saved;
-    return t || {};
+  /* Merge the trees of `parents` (3-way against their LCA), without any
+   * child patches applied. Shared by computeTrees and _baseTreeOf. */
+  _mergeParentTrees(parents, trees) {
+    const ps = parents.filter(p => trees.has(p));
+    if (!ps.length) return {};
+    if (ps.length === 1) return { ...trees.get(ps[0]) };
+    let tree = trees.get(ps[0]);
+    let accId = ps[0];
+    for (let i = 1; i < ps.length; i++) {
+      const baseId = this._lca(accId, ps[i]);
+      tree = this._merge3(baseId ? trees.get(baseId) : {}, tree, trees.get(ps[i]));
+      accId = baseId ?? accId;
+    }
+    return { ...tree };
+  }
+
+  /* Tree the given change sees from its parents — the base its {from,to}
+   * patches apply against. Never touches live state. */
+  _baseTreeOf(id) {
+    return this._mergeParentTrees(this.get(id).parents, this.computeTrees());
   }
 
   _conflictedIds(trees) {
@@ -407,6 +406,25 @@ class JJEngine {
     }
   }
 
+  /* Rewire every child of `x`: occurrences of `x` in their parent lists are
+   * replaced by `replacements` (deduped, self-loops dropped, root as the
+   * fallback when a child would end up parentless). */
+  _spliceChildren(x, replacements, exclude) {
+    const touched = [];
+    for (const kidId of this.childrenOf(x)) {
+      if (exclude && exclude.has(kidId)) continue;
+      const kid = this.get(kidId);
+      const np = [];
+      for (const p of kid.parents) {
+        if (p === x) { for (const q of replacements) if (!np.includes(q) && q !== kidId) np.push(q); }
+        else if (!np.includes(p)) np.push(p);
+      }
+      kid.parents = np.length ? np : [ROOT_ID];
+      touched.push(kidId);
+    }
+    return touched;
+  }
+
   _rows() {
     const row = {}; const indeg = {}; const queue = [];
     for (const c of this.changes.values()) {
@@ -422,8 +440,6 @@ class JJEngine {
     }
     return row;
   }
-
-  short(id) { return id.slice(0, 3); }
 
   _descOf(c) { return c.desc ? c.desc : '(no description set)'; }
 
@@ -477,7 +493,7 @@ class JJEngine {
         this.childrenOf(old).length === 0 && this.bookmarksAt(old).length === 0 &&
         this.remoteBookmarksAt(old).length === 0) {
       this.changes.delete(old);
-      lines.push({ t: `(cleaned up the empty, undescribed change ${this.short(old)})`, c: 'dim' });
+      lines.push({ t: `(cleaned up the empty, undescribed change ${old})`, c: 'dim' });
     }
   }
 
@@ -572,7 +588,6 @@ class JJEngine {
       changes: [...this.changes.values()].map(c => ({ ...c, parents: c.parents.slice(), files: JSON.parse(JSON.stringify(c.files)) })),
       bookmarks: [...this.bookmarks].map(([n, v]) => [n, typeof v === 'string' ? v : { conflict: [...v.conflict] }]),
       remote: [...this.remote].map(([n, r]) => [n, { ...r }]),
-      fetchCount: this.fetchCount,
     };
   }
 
@@ -580,7 +595,8 @@ class JJEngine {
     this.changes = new Map(snap.changes.map(c => [c.id, { ...c, parents: c.parents.slice(), files: JSON.parse(JSON.stringify(c.files)) }]));
     this.bookmarks = new Map(snap.bookmarks.map(([n, v]) => [n, typeof v === 'string' ? v : { conflict: [...v.conflict] }]));
     this.remote = new Map((snap.remote || []).map(([n, r]) => [n, { ...r }]));
-    this.fetchCount = snap.fetchCount || 0;
+    // fetchCount and this.server are deliberately NOT restored: they model the
+    // remote host, which the local op log (undo) cannot rewind.
     this.wc = snap.wc;
   }
 
@@ -702,29 +718,32 @@ class JJEngine {
       const moved = this.descendantsOf(target, true);
       rebased = moved.size;
       this._touch(moved);
-      this._moveWC(node.id, lines, new Set([target]));
+      if (!flags['no-edit']) this._moveWC(node.id, lines, new Set([target]));
     } else if (flags.A) {
       const target = this.resolve(flags.A);
       node = this._createChange([target], msg);
-      const touched = new Set();
       for (const kidId of this.childrenOf(target)) {
-        if (kidId === node.id) continue;
-        const kid = this.get(kidId);
-        this._checkRewritable(kidId);
-        kid.parents = kid.parents.map(p => (p === target ? node.id : p));
+        if (kidId !== node.id) this._checkRewritable(kidId);
+      }
+      const touched = new Set();
+      for (const kidId of this._spliceChildren(target, [node.id], new Set([node.id]))) {
         for (const d of this.descendantsOf(kidId, true)) touched.add(d);
       }
       rebased = touched.size;
       this._touch(touched);
-      this._moveWC(node.id, lines, new Set([target]));
+      if (!flags['no-edit']) this._moveWC(node.id, lines, new Set([target]));
     } else {
       let parents = pos.length ? pos.map(p => this.resolve(p)) : [this.wc];
       parents = [...new Set(parents)];
       node = this._createChange(parents, msg);
-      this._moveWC(node.id, lines);
+      if (!flags['no-edit']) this._moveWC(node.id, lines);
     }
     if (rebased) lines.push({ t: `Rebased ${rebased} descendant commits`, c: 'dim' });
-    lines.push(...this._wcLines());
+    if (flags['no-edit']) {
+      lines.push({ t: `Created new commit ${this._fmt(node.id)}`, c: 'ok' });
+    } else {
+      lines.push(...this._wcLines());
+    }
     return { op: 'new empty commit', lines };
   }
 
@@ -742,7 +761,7 @@ class JJEngine {
     this._touch(this.descendantsOf(rev, true));
     const lines = [];
     if (rev === this.wc) lines.push(...this._wcLines());
-    else lines.push({ t: `Described ${this.short(rev)} as "${flags.m}"`, c: 'ok' });
+    else lines.push({ t: `Described ${this._dispId(this.get(rev))} as "${flags.m}"`, c: 'ok' });
     return { op: `describe commit ${this.get(rev).commitId}`, lines };
   }
 
@@ -751,6 +770,7 @@ class JJEngine {
     if (typeof flags.m !== 'string') {
       throw new JJError('A description is required', 'This playground has no editor — use jj commit -m "my description".');
     }
+    this._checkRewritable(this.wc);
     const cur = this.get(this.wc);
     cur.desc = flags.m;
     this._touch(this.descendantsOf(this.wc, true));
@@ -791,15 +811,7 @@ class JJEngine {
 
     for (const x of ordered) {
       const xc = this.get(x);
-      for (const kidId of this.childrenOf(x)) {
-        const kid = this.get(kidId);
-        const np = [];
-        for (const p of kid.parents) {
-          if (p === x) { for (const q of xc.parents) if (!np.includes(q) && q !== kidId) np.push(q); }
-          else if (!np.includes(p)) np.push(p);
-        }
-        kid.parents = np.length ? np : [ROOT_ID];
-      }
+      this._spliceChildren(x, xc.parents);
       for (const name of this.bookmarksAt(x)) {
         const val = this.bookmarks.get(name);
         if (typeof val !== 'string') {
@@ -812,6 +824,18 @@ class JJEngine {
           this.bookmarks.delete(name);
           deletedBookmarks.push(name);
         }
+      }
+      for (const rname of this.remoteBookmarksAt(x)) {
+        const sref = this.server.get(rname);
+        if (sref && sref.id === x && !sref.respawn) {
+          sref.respawn = {
+            desc: xc.desc,
+            files: JSON.parse(JSON.stringify(xc.files)),
+            parentId: xc.parents[0],
+          };
+        }
+        this.remote.delete(rname);
+        lines.push({ t: `(origin still has ${rname}@origin — jj git fetch will restore it)`, c: 'dim' });
       }
       replacement.set(x, xc.parents.slice());
       lines.unshift({ t: `  ${this._fmt(x, { noConflict: true })}`, c: '' });
@@ -838,10 +862,13 @@ class JJEngine {
     if (wcWasAbandoned) {
       const expand = ids => {
         const out = [];
-        for (const id of ids) {
-          if (replacement.has(id)) out.push(...expand(replacement.get(id)));
-          else if (!out.includes(id)) out.push(id);
-        }
+        const walk = list => {
+          for (const id of list) {
+            if (replacement.has(id)) walk(replacement.get(id));
+            else if (!out.includes(id)) out.push(id);
+          }
+        };
+        walk(ids);
         return out;
       };
       let parents = expand(this.get.call(this, this.wc) ? [this.wc] : oldWcParents);
@@ -882,23 +909,22 @@ class JJEngine {
         : { from: p.from ?? null, to: p.to ?? null };
     }
 
-    for (const kidId of this.childrenOf(rev)) {
-      const kid = this.get(kidId);
-      const np = [];
-      for (const p of kid.parents) {
-        if (p === rev) { if (!np.includes(parentId)) np.push(parentId); }
-        else if (!np.includes(p)) np.push(p);
+    this._spliceChildren(rev, [parentId]);
+    for (const name of this.bookmarksAt(rev)) {
+      const val = this.bookmarks.get(name);
+      if (typeof val === 'string') this.bookmarks.set(name, parentId);
+      else {
+        const rest = [...new Set(val.conflict.map(t => (t === rev ? parentId : t)))];
+        this.bookmarks.set(name, rest.length === 1 ? rest[0] : { conflict: rest });
       }
-      kid.parents = np;
     }
-    for (const name of this.bookmarksAt(rev)) this.bookmarks.set(name, parentId);
     const wasWC = rev === this.wc;
     this.changes.delete(rev);
+    const rebased = this.descendantsOf(parentId, false);
     if (wasWC) {
       const node = this._createChange([parentId], '');
       this.wc = node.id;
     }
-    const rebased = this.descendantsOf(parentId, false);
     this._touch(this.descendantsOf(parentId, true));
     if (rebased.size) lines.unshift({ t: `Rebased ${rebased.size} descendant commits`, c: 'ok' });
     lines.push(...this._wcLines());
@@ -937,7 +963,7 @@ class JJEngine {
     for (const id of moveSet) this._checkRewritable(id);
     if (mode !== 'r') {
       for (const d of dests) if (moveSet.has(d)) {
-        throw new JJError(`Cannot rebase ${this.short(target)} onto ${this.short(d)}: the destination is part of what's being moved`);
+        throw new JJError(`Cannot rebase ${this._dispId(this.get(target))} onto ${this._dispId(this.get(d))}: the destination is part of what's being moved`);
       }
     }
 
@@ -950,23 +976,19 @@ class JJEngine {
     if (mode === 'r') {
       const tc = this.get(target);
       const kids = this.childrenOf(target);
-      if (sameParents(tc.parents, dests) && !kids.length) {
-        return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
+      if (sameParents(tc.parents, dests)) {
+        return { op: null, lines: [
+          { t: 'Skipped rebase of 1 commits that were already in place', c: 'dim' },
+          { t: 'Nothing changed.', c: 'dim' },
+        ] };
       }
-      for (const kidId of kids) {
-        const kid = this.get(kidId);
-        const np = [];
-        for (const p of kid.parents) {
-          if (p === target) { for (const q of tc.parents) if (!np.includes(q) && q !== kidId) np.push(q); }
-          else if (!np.includes(p)) np.push(p);
-        }
-        kid.parents = np.length ? np : [ROOT_ID];
+      for (const kidId of this._spliceChildren(target, tc.parents)) {
         for (const d of this.descendantsOf(kidId, true)) { touch.add(d); healedSet.add(d); }
       }
       healed = healedSet.size;
       tc.parents = dests.slice();
       if (this.ancestorsOf(target, false).has(target)) {
-        throw new JJError(`Cannot rebase ${this.short(target)} onto ${this.short(dests[0])}: that would create a cycle`);
+        throw new JJError(`Cannot rebase ${this._dispId(this.get(target))} onto ${this._dispId(this.get(dests[0]))}: that would create a cycle`);
       }
     } else {
       const roots = [...moveSet].filter(x => this.get(x).parents.every(p => !moveSet.has(p)));
@@ -1123,7 +1145,7 @@ class JJEngine {
     const file = args[sep + 1];
     let value = args.slice(0, sep).join(' ');
     this._checkRewritable(this.wc);
-    const base = this._baseTreeOf(this.wc, null);
+    const base = this._baseTreeOf(this.wc);
     let from = base[file] ?? null;
     if (isConflict(from)) from = from.conflict.base;
     if (append) {
@@ -1135,7 +1157,7 @@ class JJEngine {
     this._touch(this.descendantsOf(this.wc, true));
     return {
       op: 'snapshot working copy',
-      lines: [{ t: `Wrote ${file}. jj noticed and snapshotted it into @ (${this.short(this.wc)}) — no add, no staging.`, c: 'ok' }],
+      lines: [{ t: `Wrote ${file}. jj noticed and snapshotted it into @ (${this._dispId(this.get(this.wc))}) — no add, no staging.`, c: 'ok' }],
     };
   }
 
@@ -1147,12 +1169,12 @@ class JJEngine {
     const tree = trees.get(this.wc);
     if (!(file in tree)) throw new JJError(`No such file in @: ${file}`);
     const c = this.get(this.wc);
-    const base = this._baseTreeOf(this.wc, null);
+    const base = this._baseTreeOf(this.wc);
     const baseVal = base[file] ?? null;
     if (baseVal === null) delete c.files[file];       // existed only via @'s own edit
     else c.files[file] = { from: isConflict(baseVal) ? baseVal.conflict.base : baseVal, to: null };
     this._touch(this.descendantsOf(this.wc, true));
-    return { op: 'snapshot working copy', lines: [{ t: `Deleted ${file}; @ (${this.short(this.wc)}) now records the removal.`, c: 'ok' }] };
+    return { op: 'snapshot working copy', lines: [{ t: `Deleted ${file}; @ (${this._dispId(this.get(this.wc))}) now records the removal.`, c: 'ok' }] };
   }
 
   _shCat(args) {
@@ -1191,7 +1213,7 @@ class JJEngine {
         ]);
       }
       const c = this.get(this.wc);
-      const base = this._baseTreeOf(this.wc, null);
+      const base = this._baseTreeOf(this.wc);
       const baseVal = base[file] ?? null;
       if (baseVal === null) delete c.files[file];
       else c.files[file] = { from: isConflict(baseVal) ? baseVal.conflict.base : baseVal, to: null };
@@ -1227,8 +1249,19 @@ class JJEngine {
   _gitPush(rest) {
     const { flags } = parseArgs(rest, {
       b: { value: true, multi: true, aliases: ['bookmark'] },
-      all: {}, tracked: {}, 'allow-empty-description': {},
+      all: {}, tracked: {}, deleted: {}, 'allow-empty-description': {},
     }, 'git push');
+    if (flags.deleted) {
+      const gone = [...this.remote.keys()].filter(n => !this.bookmarks.has(n));
+      if (!gone.length) return { op: null, lines: [{ t: 'Nothing changed.', c: 'dim' }] };
+      const lines = [{ t: 'Changes to push to origin:', c: 'ok' }];
+      for (const name of gone) {
+        lines.push({ t: `  bookmark: ${name} [delete from ${this.remote.get(name).commitId}]`, c: '' });
+        this.remote.delete(name);
+        this.server.delete(name);
+      }
+      return { op: 'push deleted bookmarks to git remote origin', lines };
+    }
     // Real jj model: plain push moves bookmarks that are *tracking* a remote
     // bookmark (here: ones origin already has). -b NAME also creates+tracks
     // new bookmarks; --all pushes everything.
@@ -1432,7 +1465,8 @@ class JJEngine {
     for (const id of order) if (dests.has(id)) lines.push({ t: `  ${this._fmt(id)}`, c: '' });
     // Real jj leaves a fresh working-copy commit when @ was fully drained.
     if (!Object.keys(wcC.files).length && !wcC.desc &&
-        this.childrenOf(this.wc).length === 0 && this.bookmarksAt(this.wc).length === 0) {
+        this.childrenOf(this.wc).length === 0 && this.bookmarksAt(this.wc).length === 0 &&
+        this.remoteBookmarksAt(this.wc).length === 0) {
       const parents = wcC.parents.slice();
       this.changes.delete(this.wc);
       const node = this._createChange(parents, '');
@@ -1455,11 +1489,11 @@ class JJEngine {
     const rc = this.get(rev);
     if (!pos.length) {
       throw new JJError('jj split needs file paths in this playground (there is no interactive diff editor)',
-        `Files changed in ${this.short(rev)}: ${Object.keys(rc.files).join(', ') || '(none)'}`);
+        `Files changed in ${this._dispId(this.get(rev))}: ${Object.keys(rc.files).join(', ') || '(none)'}`);
     }
     const selected = {};
     for (const p of pos) {
-      if (!rc.files[p]) throw new JJError(`'${p}' is not changed in ${this.short(rev)}`,
+      if (!rc.files[p]) throw new JJError(`'${p}' is not changed in ${this._dispId(this.get(rev))}`,
         `Files changed there: ${Object.keys(rc.files).join(', ') || '(none)'}`);
       selected[p] = rc.files[p];
     }
@@ -1556,11 +1590,11 @@ class JJEngine {
     const rc = this.get(rev);
     const files = {};
     for (const [f, p] of Object.entries(rc.files)) files[f] = { from: p.to ?? null, to: p.from ?? null };
-    const node = this._createChange([dest], `Revert "${rc.desc || this.short(rev)}"`, files);
+    const node = this._createChange([dest], `Revert "${rc.desc || rc.displayId}"`, files);
     return {
       op: `revert commit ${rc.commitId}`,
       lines: [
-        { t: `Created ${this.short(node.id)} on ${this.short(dest)}: inverse of ${this.short(rev)} "${rc.desc}"`, c: 'ok' },
+        { t: `Created ${node.id} on ${this._dispId(this.get(dest))}: inverse of ${this._dispId(rc)} "${rc.desc}"`, c: 'ok' },
         { t: '(revert adds an inverse commit — the original stays in history)', c: 'dim' },
       ],
     };
@@ -1624,7 +1658,7 @@ class JJEngine {
       const bk = bks.length ? ' ' + bks.join(' ') : '';
       const flag = conflicted.has(c.id) ? ' (conflict)' : '';
       return {
-        t: `${sym}  ${this.short(c.id)} ${c.commitId.slice(0, 8)}${bk} ${c.id === ROOT_ID ? 'root()' : this._descOf(c)}${flag}`,
+        t: `${sym}  ${this._dispId(c)} ${c.commitId.slice(0, 8)}${bk} ${c.id === ROOT_ID ? 'root()' : this._descOf(c)}${flag}`,
         c: conflicted.has(c.id) ? 'err' : c.id === this.wc ? 'ok' : '',
       };
     });
@@ -1667,7 +1701,7 @@ class JJEngine {
       changes: [...this.changes.values()].map(c => {
         const tree = trees.get(c.id) || {};
         const treeView = {};
-        for (const [f, v] of Object.entries(tree)) treeView[f] = isConflict(v) ? '!conflict' : v;
+        for (const [f, v] of Object.entries(tree)) treeView[f] = isConflict(v) ? { conflict: true } : v;
         return {
           ...c,
           parents: c.parents.slice(),
@@ -1687,179 +1721,13 @@ class JJEngine {
   }
 }
 
-/* Structural comparison: reduce a state to its "significant" nodes (root,
- * described changes, bookmark targets, and — optionally — @), each keyed by
- * description, with edges to the nearest significant ancestors. Change and
- * commit IDs are ignored, matching jj's philosophy that IDs are incidental. */
-function analyzeState(state, opts = {}) {
-  const checkWC = opts.checkWC !== false;
-  const byId = new Map(state.changes.map(c => [c.id, c]));
-  const bkAt = {};
-  for (const [name, val] of Object.entries(state.bookmarks)) {
-    const conflicted = typeof val !== 'string';
-    const targets = conflicted ? val.conflict : [val];
-    for (const t of targets) (bkAt[t] = bkAt[t] || []).push(name + (conflicted ? '??' : ''));
-  }
-  for (const k of Object.keys(bkAt)) bkAt[k].sort();
-  const rbAt = {};
-  for (const [name, ref] of Object.entries(state.remoteBookmarks || {})) {
-    (rbAt[ref.id] = rbAt[ref.id] || []).push({ name, stale: !!ref.stale });
-  }
-  for (const k of Object.keys(rbAt)) rbAt[k].sort((a, b) => a.name.localeCompare(b.name));
-
-  const isSig = id => {
-    const c = byId.get(id);
-    if (!c) return false;
-    return c.id === ROOT_ID || !!c.desc || !!bkAt[id] || !!rbAt[id] || (checkWC && id === state.wc);
-  };
-  const keyOf = id => {
-    const c = byId.get(id);
-    if (c.id === ROOT_ID) return 'ROOT';
-    if (c.desc) return 'D:' + c.desc;
-    if (bkAt[id]) return 'B:' + bkAt[id].join(',');
-    if (rbAt[id]) return 'R:' + rbAt[id].map(r => r.name).join(',');
-    return '@';
-  };
-  const sigAncestors = id => {
-    const out = new Set(); const seen = new Set();
-    const walk = pid => {
-      if (seen.has(pid)) return;
-      seen.add(pid);
-      if (isSig(pid)) { out.add(keyOf(pid)); return; }
-      const c = byId.get(pid);
-      if (c) c.parents.forEach(walk);
-    };
-    byId.get(id).parents.forEach(walk);
-    return [...out].sort();
-  };
-
-  const nodes = [];
-  for (const c of state.changes) {
-    if (!isSig(c.id)) continue;
-    const tree = {};
-    for (const [f, v] of Object.entries(c.tree || {})) tree[f] = v === '!conflict' ? '!' : v;
-    nodes.push({
-      id: c.id,
-      key: keyOf(c.id),
-      parents: sigAncestors(c.id),
-      bookmarks: (bkAt[c.id] || []),
-      rbk: (rbAt[c.id] || []),
-      tree,
-      conflicted: !!c.conflicted,
-      wc: c.id === state.wc,
-    });
-  }
-  return { nodes, checkWC };
-}
-
-function canonState(state, opts = {}) {
-  const { nodes, checkWC } = analyzeState(state, opts);
-  return nodes.map(n => {
-    const parts = [
-      n.key,
-      'p=' + n.parents.join('|'),
-      'bk=' + n.bookmarks.join(','),
-      'rbk=' + n.rbk.map(r => r.name + (r.stale ? '~' : '')).join(','),
-      'tree=' + JSON.stringify(Object.entries(n.tree).sort((a, b) => a[0].localeCompare(b[0]))),
-    ];
-    if (checkWC) parts.push('wc=' + (n.wc ? 1 : 0));
-    return parts.join(' ; ');
-  }).sort().join('\n');
-}
-
-/* Human-readable differences between a player's state and the goal state.
- * Returns an array of plain-English messages; empty means they match. */
-function diffStates(userState, goalState, opts = {}) {
-  const U = analyzeState(userState, opts).nodes;
-  const G = analyzeState(goalState, opts).nodes;
-  const checkWC = opts.checkWC !== false;
-  const friendly = k =>
-    k === 'ROOT' ? 'root'
-    : k === '@' ? 'an empty, undescribed change'
-    : k.startsWith('D:') ? `"${k.slice(2)}"`
-    : `the change holding bookmark "${k.slice(2)}"`;
-  const plist = ps => ps.length ? ps.map(friendly).join(' + ') : '(nothing)';
-  const group = arr => {
-    const m = new Map();
-    for (const n of arr) { if (!m.has(n.key)) m.set(n.key, []); m.get(n.key).push(n); }
-    return m;
-  };
-  const uBy = group(U), gBy = group(G);
-  const msgs = [];
-
-  for (const [key, gs] of gBy) {
-    const us = uBy.get(key) || [];
-    if (!us.length) {
-      msgs.push(key === '@'
-        ? `The goal ends on a fresh empty change (@) on top of ${plist(gs[0].parents)} — finish with jj new.`
-        : `Your graph is missing a change described ${friendly(key)} on top of ${plist(gs[0].parents)}.`);
-      continue;
-    }
-    if (us.length !== gs.length) {
-      msgs.push(`You have ${us.length} changes matching ${friendly(key)}; the goal has ${gs.length}.`);
-      continue;
-    }
-    if (us[0].parents.join('|') !== gs[0].parents.join('|')) {
-      msgs.push(`${friendly(key)} sits on ${plist(us[0].parents)}, but the goal wants it on ${plist(gs[0].parents)}.`);
-    }
-    // File-tree differences at this node.
-    const uf = us[0].tree || {}, gf = gs[0].tree || {};
-    for (const f of new Set([...Object.keys(uf), ...Object.keys(gf)])) {
-      const uv = uf[f], gv = gf[f];
-      if (uv === gv) continue;
-      if (uv === '!') msgs.push(`"${f}" in ${friendly(key)} has an unresolved conflict — resolve it by writing the file (echo <content> > ${f}).`);
-      else if (gv === undefined) msgs.push(`${friendly(key)} shouldn't contain "${f}" — remove it (rm ${f}) or fix the commit that adds it.`);
-      else if (uv === undefined) msgs.push(`${friendly(key)} should contain "${f}" = "${gv}".`);
-      else msgs.push(`"${f}" in ${friendly(key)} contains "${uv}", but the goal wants "${gv}".`);
-    }
-  }
-  for (const [key, us] of uBy) {
-    if (gBy.has(key)) continue;
-    msgs.push(key === '@'
-      ? `@ is on an extra empty change (on top of ${plist(us[0].parents)}) that the goal doesn't have — jj undo, or jj edit the change @ should be on.`
-      : `You have an extra change ${friendly(key)} that isn't in the goal — jj abandon it, or jj undo.`);
-  }
-  if (checkWC) {
-    const uk = (U.find(n => n.wc) || {}).key || null;
-    const gk = (G.find(n => n.wc) || {}).key || null;
-    if (uk !== gk && gk) {
-      msgs.push(`@ should end up on ${gk === '@' ? 'the fresh empty change on top' : friendly(gk)}` +
-        (uk ? `, but yours is on ${friendly(uk)}.` : '.'));
-    }
-  }
-  const bmap = nodes => {
-    const m = new Map();
-    for (const n of nodes) for (const b of n.bookmarks) m.set(b, n.key);
-    return m;
-  };
-  const ub = bmap(U), gb = bmap(G);
-  for (const [name, key] of gb) {
-    if (!ub.has(name)) msgs.push(`Missing bookmark "${name}" — the goal has it on ${friendly(key)}.`);
-    else if (ub.get(name) !== key) msgs.push(`Bookmark "${name}" points at ${friendly(ub.get(name))}, but the goal wants it on ${friendly(key)}.`);
-  }
-  for (const name of ub.keys()) {
-    if (!gb.has(name)) msgs.push(`You have a bookmark "${name}" that isn't in the goal — jj bookmark delete ${name}.`);
-  }
-  // Remote bookmarks (origin branches).
-  const rmap = nodes => {
-    const m = new Map();
-    for (const n of nodes) for (const r of n.rbk) m.set(r.name, { key: n.key, stale: r.stale });
-    return m;
-  };
-  const ur = rmap(U), gr = rmap(G);
-  for (const [name, g] of gr) {
-    const u = ur.get(name);
-    if (!u) msgs.push(`origin has no branch "${name}" yet — the goal wants ${name}@origin on ${friendly(g.key)} (jj git push --allow-new).`);
-    else if (u.key !== g.key) msgs.push(`${name}@origin points at ${friendly(u.key)}, but the goal wants it on ${friendly(g.key)} — jj git push after moving the bookmark.`);
-    else if (u.stale && !g.stale) msgs.push(`${name}@origin is stale — you rewrote the commit locally but haven't pushed (jj git push).`);
-  }
-  for (const name of ur.keys()) {
-    if (!gr.has(name)) msgs.push(`origin has a branch "${name}" that isn't in the goal.`);
-  }
-  return msgs;
-}
-
-const JJ = { JJEngine, JJError, tokenize, canonState, analyzeState, diffStates, ROOT_ID };
+const CMP = (typeof module !== 'undefined' && module.exports)
+  ? require('./compare.js')
+  : global.JJCompare;
+const JJ = {
+  JJEngine, JJError, tokenize, ROOT_ID,
+  analyzeState: CMP.analyzeState, canonState: CMP.canonState, diffStates: CMP.diffStates,
+};
 if (typeof module !== 'undefined' && module.exports) module.exports = JJ;
 else global.JJ = JJ;
 })(typeof window !== 'undefined' ? window : globalThis);
