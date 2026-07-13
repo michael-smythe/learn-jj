@@ -128,7 +128,7 @@ function loadSandbox() {
 
 function renderAll() {
   window.GraphView.render(mainSvg, state.engine.getState());
-  if (state.level) window.GraphView.render(goalSvg, state.goalState);
+  if (state.level) window.GraphView.render(goalSvg, state.goalState, { small: true });
 }
 
 function runCheck() {

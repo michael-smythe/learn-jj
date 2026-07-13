@@ -50,7 +50,7 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 main { flex: 1; display: flex; min-height: 0; }
 
 #terminal {
-  width: 40%; min-width: 340px; max-width: 560px;
+  width: 30%; min-width: 300px; max-width: 440px;
   display: flex; flex-direction: column;
   border-right: 1px solid var(--border); background: var(--panel);
 }
@@ -112,9 +112,9 @@ body.sandbox #goalPane { display: none; }
 .nodeCircle.empty { fill: rgba(255,255,255,0.02); stroke: var(--dim); stroke-width: 1.6; stroke-dasharray: 4 4; }
 .nodeRoot { fill: #1a1f2e; stroke: #414868; stroke-width: 2; }
 .nodeRootText { fill: var(--dim) !important; font-size: 9px !important; }
-.nodeDescText { fill: var(--text); font-size: 12.5px; font-weight: 600; font-family: var(--sans); }
-.nodeEmptyText { fill: var(--dim); font-size: 9px; font-style: italic; font-family: var(--sans); }
-.nodeId { font-family: var(--mono); font-size: 10.5px; }
+.nodeDescText { fill: var(--text); font-size: 11px; font-weight: 600; font-family: var(--sans); }
+.nodeEmptyText { fill: var(--dim); font-size: 8px; font-style: italic; font-family: var(--sans); }
+.nodeId { font-family: var(--mono); font-size: 9.5px; }
 .nodeIdHi { fill: var(--purple); font-weight: 700; }
 .nodeIdLo { fill: #4c5578; }
 .wcRing { fill: none; stroke: var(--green); stroke-width: 2; opacity: .85; }
@@ -1614,14 +1614,14 @@ else global.JJ = JJ;
 (function (global) {
 'use strict';
 
-const COL_GAP = 108;
-const ROW_GAP = 92;
-const R = 20;
+const COL_GAP = 100;
+const ROW_GAP = 84;
+const R = 16;
 const SVGNS = 'http://www.w3.org/2000/svg';
 
 const stores = new WeakMap();
 
-function layout(state) {
+function layout(state, opts = {}) {
   const nodes = state.changes;
   const byId = new Map(nodes.map(c => [c.id, c]));
   const idx = new Map(nodes.map((c, i) => [c.id, i]));
@@ -1665,7 +1665,9 @@ function layout(state) {
   }
   const padL = 70, padR = 130, padT = 55, padB = 55;
   let vb = [minX - padL, minY - padT, (maxX - minX) + padL + padR, (maxY - minY) + padT + padB];
-  const minW = 340, minH = 260;
+  // Generous minimums keep small graphs zoomed out so nodes stay modest on
+  // screen; the compact goal pane gets a lower floor so it stays readable.
+  const minW = opts.small ? 320 : 600, minH = opts.small ? 280 : 500;
   if (vb[2] < minW) { vb[0] -= (minW - vb[2]) / 2; vb[2] = minW; }
   if (vb[3] < minH) { vb[1] -= (minH - vb[3]) / 2; vb[3] = minH; }
   return { pos, vb };
@@ -1762,7 +1764,7 @@ function render(svg, state, opts = {}) {
   if (!store) { store = { pos: new Map(), vb: null, raf: null }; stores.set(svg, store); }
   if (store.raf) cancelAnimationFrame(store.raf);
 
-  const { pos: target, vb: targetVb } = layout(state);
+  const { pos: target, vb: targetVb } = layout(state, opts);
   const first = store.pos.size === 0;
   const startVb = store.vb || targetVb;
 
@@ -2441,7 +2443,7 @@ function loadSandbox() {
 
 function renderAll() {
   window.GraphView.render(mainSvg, state.engine.getState());
-  if (state.level) window.GraphView.render(goalSvg, state.goalState);
+  if (state.level) window.GraphView.render(goalSvg, state.goalState, { small: true });
 }
 
 function runCheck() {

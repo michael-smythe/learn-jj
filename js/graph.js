@@ -5,14 +5,14 @@
 (function (global) {
 'use strict';
 
-const COL_GAP = 108;
-const ROW_GAP = 92;
-const R = 20;
+const COL_GAP = 100;
+const ROW_GAP = 84;
+const R = 16;
 const SVGNS = 'http://www.w3.org/2000/svg';
 
 const stores = new WeakMap();
 
-function layout(state) {
+function layout(state, opts = {}) {
   const nodes = state.changes;
   const byId = new Map(nodes.map(c => [c.id, c]));
   const idx = new Map(nodes.map((c, i) => [c.id, i]));
@@ -56,7 +56,9 @@ function layout(state) {
   }
   const padL = 70, padR = 130, padT = 55, padB = 55;
   let vb = [minX - padL, minY - padT, (maxX - minX) + padL + padR, (maxY - minY) + padT + padB];
-  const minW = 340, minH = 260;
+  // Generous minimums keep small graphs zoomed out so nodes stay modest on
+  // screen; the compact goal pane gets a lower floor so it stays readable.
+  const minW = opts.small ? 320 : 600, minH = opts.small ? 280 : 500;
   if (vb[2] < minW) { vb[0] -= (minW - vb[2]) / 2; vb[2] = minW; }
   if (vb[3] < minH) { vb[1] -= (minH - vb[3]) / 2; vb[3] = minH; }
   return { pos, vb };
@@ -153,7 +155,7 @@ function render(svg, state, opts = {}) {
   if (!store) { store = { pos: new Map(), vb: null, raf: null }; stores.set(svg, store); }
   if (store.raf) cancelAnimationFrame(store.raf);
 
-  const { pos: target, vb: targetVb } = layout(state);
+  const { pos: target, vb: targetVb } = layout(state, opts);
   const first = store.pos.size === 0;
   const startVb = store.vb || targetVb;
 

@@ -47,7 +47,7 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 main { flex: 1; display: flex; min-height: 0; }
 
 #terminal {
-  width: 40%; min-width: 340px; max-width: 560px;
+  width: 30%; min-width: 300px; max-width: 440px;
   display: flex; flex-direction: column;
   border-right: 1px solid var(--border); background: var(--panel);
 }
@@ -109,9 +109,9 @@ body.sandbox #goalPane { display: none; }
 .nodeCircle.empty { fill: rgba(255,255,255,0.02); stroke: var(--dim); stroke-width: 1.6; stroke-dasharray: 4 4; }
 .nodeRoot { fill: #1a1f2e; stroke: #414868; stroke-width: 2; }
 .nodeRootText { fill: var(--dim) !important; font-size: 9px !important; }
-.nodeDescText { fill: var(--text); font-size: 12.5px; font-weight: 600; font-family: var(--sans); }
-.nodeEmptyText { fill: var(--dim); font-size: 9px; font-style: italic; font-family: var(--sans); }
-.nodeId { font-family: var(--mono); font-size: 10.5px; }
+.nodeDescText { fill: var(--text); font-size: 11px; font-weight: 600; font-family: var(--sans); }
+.nodeEmptyText { fill: var(--dim); font-size: 8px; font-style: italic; font-family: var(--sans); }
+.nodeId { font-family: var(--mono); font-size: 9.5px; }
 .nodeIdHi { fill: var(--purple); font-weight: 700; }
 .nodeIdLo { fill: #4c5578; }
 .wcRing { fill: none; stroke: var(--green); stroke-width: 2; opacity: .85; }
